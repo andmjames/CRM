@@ -1,0 +1,24 @@
+# Netlify configuration
+[build]
+  command = "CI= npm run build"
+  publish = "build"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+  CI = "false"
+
+# The time engine: runs every 5 minutes, drains the action queue.
+[functions."engine"]
+  schedule = "*/5 * * * *"
+
+# SPA routing — let the client handle routes, but keep functions reachable.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

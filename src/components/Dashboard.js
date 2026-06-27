@@ -80,10 +80,12 @@ export default function Dashboard({ data, onOpenLead, onViewUpcoming }) {
       </div>
 
       {campaigns.map((c) => {
-        const cos = (companiesByCampaign[c.id] || []).slice().sort((a, b) => a.name.localeCompare(b.name));
         const cleads = leadsByCampaign[c.id] || [];
         const leadsByCompany = {};
         cleads.forEach((l) => { (leadsByCompany[l.company_id || 'none'] ||= []).push(l); });
+        const cos = (companiesByCampaign[c.id] || [])
+          .filter((co) => (leadsByCompany[co.id] || []).length > 0)
+          .sort((a, b) => a.name.localeCompare(b.name));
         const isOpen = !!open[c.id];
         return (
           <div className="card campaign" key={c.id}>

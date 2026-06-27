@@ -35,9 +35,6 @@ export default function App() {
   function openLead(id) { setLeadId(id); }
   function go(v) { setLeadId(null); setView(v); }
 
-  const TITLES = { home: 'CRM', leads: 'Leads', upcoming: 'Upcoming emails', manage: 'Campaigns', settings: 'Settings' };
-  const pageTitle = leadId ? 'Lead' : (TITLES[view] || 'CRM');
-
   const tab = (key, label) => (
     <button className={view === key && !leadId ? 'active' : ''} onClick={() => go(key)}>{label}</button>
   );
@@ -47,7 +44,7 @@ export default function App() {
       <header className="app-header">
         <img src={LOGO_SRC} alt="PMI Tape" className="header-logo" />
         <span className="header-divider" />
-        <span className="header-page-title">{pageTitle}</span>
+        <span className="header-page-title">CRM</span>
         <nav>
           {tab('home', 'Dashboard')}
           {tab('leads', 'Leads')}

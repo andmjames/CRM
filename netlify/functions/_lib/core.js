@@ -20,13 +20,35 @@ function requireAuth(event) {
   return got === expected;
 }
 
+// The four print-shop samples that collectively read as "Screen Tape".
+const SCREEN_TAPE_GROUP = ['Split Tape', 'Full Adhesive Tape', 'Quick Rip Tape', 'RED Tape'];
+
+function humanJoin(arr) {
+  if (arr.length <= 1) return arr.join('');
+  if (arr.length === 2) return `${arr[0]} and ${arr[1]}`;
+  return `${arr.slice(0, -1).join(', ')} and ${arr[arr.length - 1]}`;
+}
+
+// Collapse the full screen-tape set into "Screen Tape"; list everything else
+// (PalletGel, Dual-Tack Pallet Tape, etc.) separately.
+function summarizeSamples(samples) {
+  const list = (samples || []).map((s) => String(s).trim()).filter(Boolean);
+  if (!list.length) return 'samples';
+  const set = new Set(list);
+  const hasAllScreen = SCREEN_TAPE_GROUP.every((s) => set.has(s));
+  let out;
+  if (hasAllScreen) {
+    out = ['Screen Tape', ...list.filter((s) => !SCREEN_TAPE_GROUP.includes(s))];
+  } else {
+    out = list;
+  }
+  return humanJoin(out);
+}
+
 function fillTemplate(body, lead) {
-  const samples = (lead.samples && lead.samples.length)
-    ? lead.samples.join(', ')
-    : 'samples';
   return (body || '')
     .replace(/FIRST_NAME/g, lead.first_name || 'there')
-    .replace(/SAMPLES/g, samples);
+    .replace(/SAMPLES/g, summarizeSamples(lead.samples));
 }
 
 // Whether to restrict sends to weekdays/non-holidays/window. Defaults to true

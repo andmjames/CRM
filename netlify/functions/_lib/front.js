@@ -37,6 +37,12 @@ function signatureFields() {
   return id ? { signature_id: id } : { should_add_default_signature: true };
 }
 
+// Front appends the signature immediately after the body. Trim trailing
+// whitespace and add exactly one blank line so there's a gap before it.
+function withSignatureGap(body) {
+  return `${String(body || '').replace(/\s+$/, '')}\n\n`;
+}
+
 // Send an outbound email from a channel (Cold leads). Creates + sends.
 async function sendMessage({ channelAddress, to, subject, body }) {
   return frontFetch(`/channels/${channelAlias(channelAddress)}/messages`, {
@@ -44,7 +50,7 @@ async function sendMessage({ channelAddress, to, subject, body }) {
     body: JSON.stringify({
       to: Array.isArray(to) ? to : [to],
       subject,
-      body,                 // plain text / HTML
+      body: withSignatureGap(body),   // plain text / HTML
       author_id: process.env.FRONT_AUTHOR_ID,
       ...signatureFields(),
       options: { archive: false },
@@ -59,7 +65,7 @@ async function createDraft({ channelAddress, to, subject, body }) {
     body: JSON.stringify({
       to: Array.isArray(to) ? to : [to],
       subject,
-      body,
+      body: withSignatureGap(body),
       author_id: process.env.FRONT_AUTHOR_ID,
       ...signatureFields(),
     }),
@@ -73,7 +79,7 @@ async function createDraftReply({ conversationId, channelAddress, body, to }) {
     body: JSON.stringify({
       channel_id: channelAddress ? undefined : undefined, // resolved by Front from convo
       to: to && (Array.isArray(to) ? to : [to]),
-      body,
+      body: withSignatureGap(body),
       author_id: process.env.FRONT_AUTHOR_ID,
       ...signatureFields(),
     }),

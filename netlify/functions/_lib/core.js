@@ -158,20 +158,39 @@ async function enqueueNextColdEmail({ lead, campaign, justSentStep }) {
   const useWeeks = overrides && overrides[nextStep - 2] != null ? overrides[nextStep - 2] : weeks;
   const scheduledFor = rollForward(nowLocal().plus({ weeks: useWeeks }), start, end, businessDaysOnly(settings));
   const greeting = greetingWord(scheduledFor.toUTC().toISO());
+  const scheduledIso = scheduledFor.toUTC().toISO();
 
-  let gen;
-  try {
-    gen = await generateColdFollowup({
-      campaign,
-      lead,
-      priorEmails: (prior || []).map((p) => ({ subject: p.subject, body: p.generated_body })),
-      styleGuide: campaign.style_guide,
-      globalCorrections,
-      stepNumber: nextStep,
-      greeting,
-    });
-  } catch (e) {
-    gen = { subject: `Following up`, body: `${greeting} ${lead.first_name || 'there'},\n\nJust following up.` };
+  // Follow-ups keep the first email's subject so the thread stays consistent.
+  const firstSubject = (prior && prior[0] && prior[0].subject) || 'Following up';
+
+  // If a fixed template exists for this step, use it verbatim (just placeholders
+  // filled). Otherwise, AI-generate a follow-up from the prior emails.
+  const { data: stepTpl } = await supabase
+    .from('templates').select('subject, body')
+    .eq('campaign_id', campaign.id).eq('step', nextStep).maybeSingle();
+
+  let subject;
+  let body;
+  if (stepTpl && stepTpl.body) {
+    subject = stepTpl.subject || firstSubject;
+    body = fillTemplate(stepTpl.body, lead, scheduledIso);
+  } else {
+    let gen;
+    try {
+      gen = await generateColdFollowup({
+        campaign,
+        lead,
+        priorEmails: (prior || []).map((p) => ({ subject: p.subject, body: p.generated_body })),
+        styleGuide: campaign.style_guide,
+        globalCorrections,
+        stepNumber: nextStep,
+        greeting,
+      });
+    } catch (e) {
+      gen = { body: `${greeting} ${lead.first_name || 'there'},\n\nJust following up.` };
+    }
+    subject = firstSubject;
+    body = gen.body || '';
   }
 
   await supabase.from('scheduled_actions').insert({
@@ -179,9 +198,9 @@ async function enqueueNextColdEmail({ lead, campaign, justSentStep }) {
     campaign_id: campaign.id,
     action_type: 'send',
     step: nextStep,
-    scheduled_for: scheduledFor.toUTC().toISO(),
-    subject: gen.subject || 'Following up',
-    generated_body: gen.body || '',
+    scheduled_for: scheduledIso,
+    subject,
+    generated_body: body,
     channel_address: campaign.front_channel_address,
   });
 }

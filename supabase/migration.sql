@@ -187,11 +187,42 @@ on conflict do nothing;
 
 -- Seed Email 1 templates
 insert into templates (campaign_id, step, subject, body)
-select id, 1, 'Checking in on your samples',
+select id, 1, 'PMI Tape Samples',
   'GREETING FIRST_NAME,
 
 Have you had a chance to try out the SAMPLES samples?
 I''d love to hear how our tape worked out for you all.
+
+Thank you very much,'
+from campaigns where name = 'PMI to Print Shops'
+on conflict (campaign_id, step) do nothing;
+
+-- PMI follow-up templates (steps 2-4): near-clones of email 1 with slight wording shifts.
+insert into templates (campaign_id, step, subject, body)
+select id, 2, 'PMI Tape Samples',
+  'GREETING FIRST_NAME,
+
+Have you had a chance to try out the SAMPLES samples? I''d love to hear how the tape worked for you all if so.
+
+Thank you very much,'
+from campaigns where name = 'PMI to Print Shops'
+on conflict (campaign_id, step) do nothing;
+
+insert into templates (campaign_id, step, subject, body)
+select id, 3, 'PMI Tape Samples',
+  'GREETING FIRST_NAME,
+
+Have you had a chance to try out the SAMPLES samples from a few months ago? I''d love to hear how the tape worked for you all if so.
+
+Thank you very much,'
+from campaigns where name = 'PMI to Print Shops'
+on conflict (campaign_id, step) do nothing;
+
+insert into templates (campaign_id, step, subject, body)
+select id, 4, 'PMI Tape Samples',
+  'GREETING FIRST_NAME,
+
+Have you had a chance to try out the SAMPLES samples from a while back? If there''s anything I can do to help just let me know.
 
 Thank you very much,'
 from campaigns where name = 'PMI to Print Shops'

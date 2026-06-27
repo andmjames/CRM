@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
+import ManageCampaigns from './ManageCampaigns';
 
-export default function SettingsPanel({ notify }) {
+export default function SettingsPanel({ notify, onChanged }) {
   const [s, setS] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -65,6 +66,9 @@ export default function SettingsPanel({ notify }) {
       <div className="row" style={{ marginTop: 16 }}>
         <button className="btn" disabled={busy} onClick={save}>Save settings</button>
       </div>
+
+      <div className="divider" style={{ margin: '28px 0 20px' }} />
+      <ManageCampaigns notify={notify} onChanged={onChanged || (() => {})} />
     </>
   );
 }

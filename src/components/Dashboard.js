@@ -1,24 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 
-const STATUS_LABEL = {
-  cold: 'Cold', dialogue: 'Dialogue', current_customer: 'Current customer', inactive: 'Inactive',
-};
 const ZONE = 'America/Indiana/Indianapolis';
 function fmtWhen(iso) {
   return new Date(iso).toLocaleString('en-US', { timeZone: ZONE, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 function typeLabel(t) { return t === 'send' ? 'Email' : t === 'draft' ? 'Draft' : 'Comment'; }
 
-function StatusPill({ status }) {
+// Distinct, tasteful slice colors (assigned per campaign by order).
+const PALETTE = ['#2f5d8a', '#3b6d11', '#b8860b', '#a32d2d', '#5b4b8a', '#0f766e'];
+
+function LeadsDonut({ slices, total }) {
+  const radius = 70, stroke = 26, cx = 100, cy = 100;
+  const C = 2 * Math.PI * radius;
+  let offset = 0;
   return (
-    <span className={`pill ${status}`}><span className="dot" />{STATUS_LABEL[status] || status}</span>
+    <svg viewBox="0 0 200 200" width="190" height="190" role="img" aria-label="Leads by campaign">
+      <g transform="rotate(-90 100 100)">
+        {total === 0 ? (
+          <circle cx={cx} cy={cy} r={radius} fill="none" stroke="var(--border)" strokeWidth={stroke} />
+        ) : slices.map((s) => {
+          const len = (s.value / total) * C;
+          const el = (
+            <circle key={s.id} cx={cx} cy={cy} r={radius} fill="none"
+              stroke={s.color} strokeWidth={stroke}
+              strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-offset} />
+          );
+          offset += len;
+          return el;
+        })}
+      </g>
+      <text x="100" y="96" textAnchor="middle" style={{ fontSize: 30, fontWeight: 700, fill: 'var(--text)' }}>{total}</text>
+      <text x="100" y="118" textAnchor="middle" style={{ fontSize: 12, fill: 'var(--text2)' }}>{total === 1 ? 'lead' : 'leads'}</text>
+    </svg>
   );
 }
 
 export default function Dashboard({ data, onOpenLead, onViewUpcoming }) {
-  const { campaigns, companies, leads, stats } = data;
-  const [open, setOpen] = useState(() => (campaigns[0] ? { [campaigns[0].id]: true } : {}));
+  const { campaigns, leads, stats } = data;
   const [upcoming, setUpcoming] = useState(null);
 
   useEffect(() => {
@@ -27,10 +46,14 @@ export default function Dashboard({ data, onOpenLead, onViewUpcoming }) {
     return () => { alive = false; };
   }, []);
 
-  const leadsByCampaign = {};
-  leads.forEach((l) => { (leadsByCampaign[l.campaign_id] ||= []).push(l); });
-  const companiesByCampaign = {};
-  companies.forEach((c) => { (companiesByCampaign[c.campaign_id] ||= []).push(c); });
+  const countByCampaign = {};
+  leads.forEach((l) => { countByCampaign[l.campaign_id] = (countByCampaign[l.campaign_id] || 0) + 1; });
+
+  const campaignCounts = campaigns.map((c, i) => ({
+    id: c.id, label: c.name, value: countByCampaign[c.id] || 0, color: PALETTE[i % PALETTE.length],
+  }));
+  const pieSlices = campaignCounts.filter((s) => s.value > 0);
+  const totalLeads = campaignCounts.reduce((s, x) => s + x.value, 0);
 
   const preview = (upcoming || []).slice(0, 6);
 
@@ -47,8 +70,28 @@ export default function Dashboard({ data, onOpenLead, onViewUpcoming }) {
         <div className="stat"><div className="n" style={{ color: 'var(--success)' }}>{stats.sendsNext7Days}</div><div className="l">Sends next 7 days</div></div>
       </div>
 
-      {/* Upcoming automatic actions */}
+      {/* Leads by campaign */}
       <div className="card card-pad" style={{ marginBottom: 18 }}>
+        <p className="section-title" style={{ marginTop: 0, marginBottom: 14 }}>Leads by campaign</p>
+        <div style={{ display: 'flex', gap: 28, alignItems: 'center', flexWrap: 'wrap' }}>
+          <LeadsDonut slices={pieSlices} total={totalLeads} />
+          <div style={{ flex: 1, minWidth: 220 }}>
+            {campaignCounts.map((s) => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '.5px solid var(--border)' }}>
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: s.value > 0 ? s.color : 'var(--border)', flex: '0 0 auto' }} />
+                <span style={{ flex: 1, fontWeight: 500 }}>{s.label}</span>
+                <span className="muted-sm">{s.value} {s.value === 1 ? 'lead' : 'leads'}</span>
+              </div>
+            ))}
+            {totalLeads === 0 && (
+              <div className="muted-sm" style={{ paddingTop: 10 }}>No leads yet. Add or import leads to get started.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Upcoming automatic actions */}
+      <div className="card card-pad">
         <div className="row" style={{ marginBottom: 10 }}>
           <p className="section-title" style={{ margin: 0 }}>Upcoming automatic actions</p>
           <div className="spacer" />
@@ -78,64 +121,6 @@ export default function Dashboard({ data, onOpenLead, onViewUpcoming }) {
           );
         })}
       </div>
-
-      {campaigns.map((c) => {
-        const cleads = leadsByCampaign[c.id] || [];
-        const leadsByCompany = {};
-        cleads.forEach((l) => { (leadsByCompany[l.company_id || 'none'] ||= []).push(l); });
-        const cos = (companiesByCampaign[c.id] || [])
-          .filter((co) => (leadsByCompany[co.id] || []).length > 0)
-          .sort((a, b) => a.name.localeCompare(b.name));
-        const isOpen = !!open[c.id];
-        return (
-          <div className="card campaign" key={c.id}>
-            <div className="campaign-head" onClick={() => setOpen((o) => ({ ...o, [c.id]: !o[c.id] }))}>
-              <div>
-                <h2>{c.name}</h2>
-                <div className="campaign-meta">{c.front_channel_address} · {cleads.length} leads</div>
-              </div>
-              <div className="row">
-                <span className="muted-sm">{isOpen ? '▾' : '▸'}</span>
-              </div>
-            </div>
-
-            {isOpen && (
-              <div>
-                {cos.length === 0 && (leadsByCompany.none || []).length === 0 && (
-                  <div className="empty" style={{ padding: 24 }}>No leads yet in this campaign.</div>
-                )}
-                {cos.map((co) => (
-                  <Company key={co.id} name={co.name} leads={leadsByCompany[co.id] || []} onOpenLead={onOpenLead} />
-                ))}
-                {(leadsByCompany.none || []).length > 0 && (
-                  <Company name="(No company)" leads={leadsByCompany.none} onOpenLead={onOpenLead} />
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
     </>
-  );
-}
-
-function Company({ name, leads, onOpenLead }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="company">
-      <div className="company-row" onClick={() => setOpen((o) => !o)}>
-        <div><strong>{name}</strong> <span className="muted-sm">· {leads.length}</span></div>
-        <span className="muted-sm">{open ? '▾' : '▸'}</span>
-      </div>
-      {open && leads.map((l) => (
-        <div className="lead-row" key={l.id} onClick={() => onOpenLead(l.id)}>
-          <div>
-            <div className="lead-name">{[l.first_name, l.last_name].filter(Boolean).join(' ') || l.email}</div>
-            <div className="lead-email">{l.email}</div>
-          </div>
-          <StatusPill status={l.status} />
-        </div>
-      ))}
-    </div>
   );
 }

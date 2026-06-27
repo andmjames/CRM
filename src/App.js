@@ -5,12 +5,11 @@ import Dashboard from './components/Dashboard';
 import Leads from './components/Leads';
 import UpcomingEmails from './components/UpcomingEmails';
 import LeadDetail from './components/LeadDetail';
-import ManageCampaigns from './components/ManageCampaigns';
 import SettingsPanel from './components/SettingsPanel';
 import AddLeadModal from './components/AddLeadModal';
 
 export default function App() {
-  const [view, setView] = useState('home'); // home | leads | upcoming | manage | settings
+  const [view, setView] = useState('home'); // home | leads | upcoming | settings
   const [leadId, setLeadId] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +48,6 @@ export default function App() {
           {tab('home', 'Dashboard')}
           {tab('leads', 'Leads')}
           {tab('upcoming', 'Upcoming')}
-          {tab('manage', 'Campaigns')}
           {tab('settings', 'Settings')}
         </nav>
         <div className="spacer" />
@@ -75,10 +73,8 @@ export default function App() {
             <Leads data={data} onOpenLead={openLead} />
           ) : view === 'upcoming' ? (
             <UpcomingEmails onOpenLead={openLead} notify={notify} />
-          ) : view === 'manage' ? (
-            <ManageCampaigns notify={notify} onChanged={load} />
           ) : (
-            <SettingsPanel notify={notify} />
+            <SettingsPanel notify={notify} onChanged={load} />
           )
         )}
       </div>

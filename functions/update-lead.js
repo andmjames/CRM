@@ -4,7 +4,7 @@ const { json, requireAuth } = require('./_lib/core');
 
 const VALID_STATUS = ['cold', 'dialogue', 'current_customer', 'inactive'];
 
-exports.handler = async (event) => {
+const _handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'POST only' });
   if (!requireAuth(event)) return json(401, { error: 'unauthorized' });
 
@@ -38,5 +38,22 @@ exports.handler = async (event) => {
       .eq('lead_id', id).in('status', ['pending']);
   }
 
+  // Best-effort: mirror a status change onto the Front conversation tags (if the
+  // lead has a linked conversation). Non-blocking — never fails the update.
+  if (status && lead?.front_conversation_id) {
+    const TAG = { cold: 'Cold', dialogue: 'Dialogue', current_customer: 'Current Customer', inactive: 'Inactive' };
+    (async () => {
+      try {
+        const front = require('./_lib/front');
+        await front.applyTag(lead.front_conversation_id, TAG[status]);
+        for (const [k, name] of Object.entries(TAG)) {
+          if (k !== status) front.removeTag(lead.front_conversation_id, name).catch(() => {});
+        }
+      } catch { /* ignore */ }
+    })();
+  }
+
   return json(200, { lead });
 };
+
+exports.handler = require('./_lib/core').safe(_handler);

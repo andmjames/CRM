@@ -29,6 +29,12 @@ function fillTemplate(body, lead) {
     .replace(/SAMPLES/g, samples);
 }
 
+// Whether to restrict sends to weekdays/non-holidays/window. Defaults to true
+// when the setting is absent; only an explicit 'false' turns it off.
+function businessDaysOnly(settings) {
+  return (settings.business_days_only ?? 'true') !== 'false';
+}
+
 // Find the next staggered send time on a channel so bulk sends don't fire at once.
 async function nextStaggeredSlot(channelAddress, settings) {
   const minGap = Number(settings.stagger_seconds_min || 60);
@@ -55,7 +61,7 @@ async function nextStaggeredSlot(channelAddress, settings) {
     const candidate = last.plus({ seconds: gap });
     if (candidate > base) base = candidate;
   }
-  return rollForward(base, start, end);
+  return rollForward(base, start, end, businessDaysOnly(settings));
 }
 
 // Enqueue the first cold email for a freshly created lead.
@@ -76,7 +82,7 @@ async function enqueueColdEmail1(lead, campaign) {
     scheduledFor = await nextStaggeredSlot(campaign.front_channel_address, settings);
   } else {
     const weeks = Number(campaign.first_email_weeks || 0);
-    scheduledFor = rollForward(nowLocal().plus({ weeks }), start, end);
+    scheduledFor = rollForward(nowLocal().plus({ weeks }), start, end, businessDaysOnly(settings));
   }
 
   await supabase.from('scheduled_actions').insert({
@@ -131,7 +137,7 @@ async function enqueueNextColdEmail({ lead, campaign, justSentStep }) {
   const end = Number(settings.send_window_end_hour || 16);
   const overrides = (lead.interval_overrides && lead.interval_overrides.followup_weeks) || null;
   const useWeeks = overrides && overrides[nextStep - 2] != null ? overrides[nextStep - 2] : weeks;
-  const scheduledFor = rollForward(nowLocal().plus({ weeks: useWeeks }), start, end);
+  const scheduledFor = rollForward(nowLocal().plus({ weeks: useWeeks }), start, end, businessDaysOnly(settings));
 
   await supabase.from('scheduled_actions').insert({
     lead_id: lead.id,
@@ -145,8 +151,20 @@ async function enqueueNextColdEmail({ lead, campaign, justSentStep }) {
   });
 }
 
+// Wrap a handler so any thrown error becomes a readable JSON 500 instead of a 502.
+function safe(handler) {
+  return async (event, context) => {
+    try {
+      return await handler(event, context);
+    } catch (e) {
+      return json(500, { error: e && e.message ? e.message : String(e) });
+    }
+  };
+}
+
 module.exports = {
   json,
+  safe,
   requireAuth,
   fillTemplate,
   nextStaggeredSlot,

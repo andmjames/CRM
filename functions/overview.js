@@ -3,7 +3,7 @@ const { supabase } = require('./_lib/supabase');
 const { json, requireAuth } = require('./_lib/core');
 const { nowLocal } = require('./_lib/schedule');
 
-exports.handler = async (event) => {
+const _handler = async (event) => {
   if (!requireAuth(event)) return json(401, { error: 'unauthorized' });
 
   const [{ data: campaigns }, { data: companies }, { data: leads }] = await Promise.all([
@@ -33,3 +33,5 @@ exports.handler = async (event) => {
     },
   });
 };
+
+exports.handler = require('./_lib/core').safe(_handler);

@@ -30,6 +30,13 @@ function channelAlias(address) {
   return `alt:address:${encodeURIComponent(address)}`;
 }
 
+// Signature attachment. By default Front picks the channel/teammate default
+// signature. Set FRONT_SIGNATURE_ID to force a specific one.
+function signatureFields() {
+  const id = process.env.FRONT_SIGNATURE_ID;
+  return id ? { signature_id: id } : { should_add_default_signature: true };
+}
+
 // Send an outbound email from a channel (Cold leads). Creates + sends.
 async function sendMessage({ channelAddress, to, subject, body }) {
   return frontFetch(`/channels/${channelAlias(channelAddress)}/messages`, {
@@ -39,6 +46,7 @@ async function sendMessage({ channelAddress, to, subject, body }) {
       subject,
       body,                 // plain text / HTML
       author_id: process.env.FRONT_AUTHOR_ID,
+      ...signatureFields(),
       options: { archive: false },
     }),
   });
@@ -53,6 +61,7 @@ async function createDraft({ channelAddress, to, subject, body }) {
       subject,
       body,
       author_id: process.env.FRONT_AUTHOR_ID,
+      ...signatureFields(),
     }),
   });
 }
@@ -66,6 +75,7 @@ async function createDraftReply({ conversationId, channelAddress, body, to }) {
       to: to && (Array.isArray(to) ? to : [to]),
       body,
       author_id: process.env.FRONT_AUTHOR_ID,
+      ...signatureFields(),
     }),
   });
 }
@@ -85,10 +95,58 @@ async function findConversationByEmail(email) {
   return (json._results && json._results[0]) || null;
 }
 
+// --- Tags ---
+let _tagCache = null;
+async function listTags() {
+  if (_tagCache) return _tagCache;
+  const json = await frontFetch('/tags');
+  _tagCache = json._results || [];
+  return _tagCache;
+}
+async function tagIdByName(name) {
+  const tags = await listTags();
+  const t = tags.find((x) => (x.name || '').toLowerCase() === String(name).toLowerCase());
+  return t ? t.id : null;
+}
+async function applyTag(conversationId, tagName) {
+  const id = await tagIdByName(tagName);
+  if (!id) return null;
+  return frontFetch(`/conversations/${conversationId}/tags`, {
+    method: 'POST', body: JSON.stringify({ tag_ids: [id] }),
+  });
+}
+async function removeTag(conversationId, tagName) {
+  const id = await tagIdByName(tagName);
+  if (!id) return null;
+  return frontFetch(`/conversations/${conversationId}/tags`, {
+    method: 'DELETE', body: JSON.stringify({ tag_ids: [id] }),
+  });
+}
+
+// --- Conversation context ---
+async function getMessages(conversationId) {
+  const json = await frontFetch(`/conversations/${conversationId}/messages`);
+  return json._results || [];
+}
+// Best-effort: pull readable text from the most recent inbound messages.
+async function getThreadText(conversationId, limit = 3) {
+  const msgs = await getMessages(conversationId);
+  return msgs.slice(0, limit).map((m) => {
+    const who = m.is_inbound ? 'Them' : 'Us';
+    const body = (m.text || m.body || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return `${who}: ${body}`;
+  }).reverse().join('\n');
+}
+
 module.exports = {
   sendMessage,
   createDraft,
   createDraftReply,
   createComment,
   findConversationByEmail,
+  listTags,
+  applyTag,
+  removeTag,
+  getMessages,
+  getThreadText,
 };

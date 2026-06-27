@@ -85,4 +85,28 @@ async function generateReply({ kind, campaign, lead, threadText, firstNames, sty
   return parseJson(text);
 }
 
-module.exports = { generateColdFollowup, generateReply, MODEL };
+// Interpret a free-form Front comment as a single structured action.
+// Returns { action, status?, days?, note? }.
+async function generateCommandFromComment({ commentText, lead, campaign }) {
+  const system = [
+    'You convert a short internal instruction (a Front comment) about an outreach lead into ONE structured action.',
+    'Output ONLY valid JSON, no markdown: {"action":"...","status":"...","days":0,"note":"..."}.',
+    'Valid "action" values:',
+    '- "pause": pause scheduled emails for N days (include "days").',
+    '- "resume": unpause the lead.',
+    '- "set_status": change status (include "status" = cold|dialogue|current_customer|inactive).',
+    '- "stop": permanently stop contacting this lead (do not contact).',
+    '- "note": just record the text as an internal note (include "note").',
+    '- "none": no actionable instruction.',
+    'Include only the keys relevant to the action. If the comment is ambiguous or conversational, use "none".',
+  ].join('\n');
+  const user = [
+    `Lead: ${lead.first_name || ''} ${lead.last_name || ''} <${lead.email}>, current status ${lead.status}, campaign ${campaign?.name || ''}.`,
+    `Comment: "${commentText}"`,
+    'Return the JSON action.',
+  ].join('\n');
+  const text = await callClaude(system, user);
+  return parseJson(text);
+}
+
+module.exports = { generateColdFollowup, generateReply, generateCommandFromComment, MODEL };

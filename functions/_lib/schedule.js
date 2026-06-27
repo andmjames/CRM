@@ -53,7 +53,10 @@ function isBusinessDay(dt) {
 // day but outside the send window, it stays that day (the engine sends when due);
 // if it's a weekend/holiday OR after the window closes, move to the next business
 // morning at sendWindowStart.
-function rollForward(dt, sendWindowStart = 8, sendWindowEnd = 16) {
+function rollForward(dt, sendWindowStart = 8, sendWindowEnd = 16, businessDaysOnly = true) {
+  // Testing escape hatch: when business-days-only is off, don't defer at all —
+  // schedule at the requested time so sends fire on the next engine tick.
+  if (!businessDaysOnly) return dt;
   let d = dt;
   // If past today's window, push to tomorrow morning before checking business day.
   if (d.hour >= sendWindowEnd) {

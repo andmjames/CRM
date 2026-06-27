@@ -95,7 +95,7 @@ const _handler = async (event) => {
       step: 1,
       scheduled_for: when.toUTC().toISO(),
       subject: tpl?.subject || '',
-      generated_body: fillTemplate(tpl?.body || 'Hello FIRST_NAME,', lead),
+      generated_body: fillTemplate(tpl?.body || 'GREETING FIRST_NAME,', lead, when.toUTC().toISO()),
       channel_address: campaign.front_channel_address,
     });
     created.push(email);

@@ -166,7 +166,7 @@ insert into campaigns
 values
   ('PMI to Print Shops', 'PMI', 'andrew@pmitape.com', 'print_shops',
    'PMI manufactures industrial adhesive tapes for print/sign shops: Split Tape, Full Adhesive Tape, Quick Rip Tape, RED Tape, PalletGel, and Dual-Tack Pallet Tape.',
-   'This is a sample follow-up. Reference the specific samples the customer requested. Be helpful, not pushy.',
+   'Match the tone of the initial email: short, warm, and personal. Ask how the requested samples worked out for them, offer to help if useful, and sign off with "Thank you very much,". Never pushy or salesy. Two or three sentences at most.',
    'weeks', 3, '{4,8,12}', 4, true),
 
   ('FloorBond to Retailers', 'FloorBond', 'andrew@floorbondtape.com', 'retailers',
@@ -188,25 +188,30 @@ on conflict do nothing;
 -- Seed Email 1 templates
 insert into templates (campaign_id, step, subject, body)
 select id, 1, 'Checking in on your samples',
-  'Hello FIRST_NAME, I wanted to check in to see how the SAMPLES are working for you all. If I can help in any way just let me know.'
+  'GREETING FIRST_NAME,
+
+Have you had a chance to try out the SAMPLES samples?
+I''d love to hear how our tape worked out for you all.
+
+Thank you very much,'
 from campaigns where name = 'PMI to Print Shops'
 on conflict (campaign_id, step) do nothing;
 
 insert into templates (campaign_id, step, subject, body)
 select id, 1, 'A flooring tape that''s stronger than glue',
-  'Hello FIRST_NAME, We manufacture a new flooring tape that is super permanent and unlike anything in the industry. It''s the first flooring tape that''s stronger than glue. Here''s some info on the product: https://www.floorbondtape.com/about-us. There is truly nothing like FloorBond on DIY shelves today. We have proven incremental and accretive to Flooring category sales at retail stores. To launch, we would only need 5" on your shelf (case pack enables one facing). If you''d like, we would be happy to stop by to show you this product in person. Just let me know. I really appreciate the opportunity.'
+  'GREETING FIRST_NAME, We manufacture a new flooring tape that is super permanent and unlike anything in the industry. It''s the first flooring tape that''s stronger than glue. Here''s some info on the product: https://www.floorbondtape.com/about-us. There is truly nothing like FloorBond on DIY shelves today. We have proven incremental and accretive to Flooring category sales at retail stores. To launch, we would only need 5" on your shelf (case pack enables one facing). If you''d like, we would be happy to stop by to show you this product in person. Just let me know. I really appreciate the opportunity.'
 from campaigns where name = 'FloorBond to Retailers'
 on conflict (campaign_id, step) do nothing;
 
 insert into templates (campaign_id, step, subject, body)
 select id, 1, 'A rug tape that leaves no residue',
-  'Hello FIRST_NAME, We''re launching a patent-pending rug tape called Tape Genie that solves one of the biggest complaints in this category — residue on floors. One side of Tape Genie grips the rug very well and the other side always peels cleanly from the floor. Tape Genie is priced to be an impulse purchase at $5.98/Roll. We''ve produced a national TV commercial that begins airing in a few weeks. If it would be helpful, I would be happy to stop by to show you this commercial before it airs and to go over Tape Genie in more detail. Just let me know! Thank you very much,'
+  'GREETING FIRST_NAME, We''re launching a patent-pending rug tape called Tape Genie that solves one of the biggest complaints in this category — residue on floors. One side of Tape Genie grips the rug very well and the other side always peels cleanly from the floor. Tape Genie is priced to be an impulse purchase at $5.98/Roll. We''ve produced a national TV commercial that begins airing in a few weeks. If it would be helpful, I would be happy to stop by to show you this commercial before it airs and to go over Tape Genie in more detail. Just let me know! Thank you very much,'
 from campaigns where name = 'Tape Genie to Retailers'
 on conflict (campaign_id, step) do nothing;
 
 insert into templates (campaign_id, step, subject, body)
 select id, 1, 'A deck joist tape unlike anything on shelves',
-  'Hello FIRST_NAME, We manufacture DeckBond, a new deck joist tape that''s super permanent and unlike anything in the industry. It seals and protects deck joists from moisture to dramatically extend the life of a deck. Here''s some info on the product: https://www.deckbond.com. There''s truly nothing like DeckBond on DIY shelves today, and it has proven incremental and accretive to category sales at retail. To launch, we would only need 5" on your shelf (case pack enables one facing). If you''d like, we''d be happy to stop by to show you this product in person. Just let me know. I really appreciate the opportunity.'
+  'GREETING FIRST_NAME, We manufacture DeckBond, a new deck joist tape that''s super permanent and unlike anything in the industry. It seals and protects deck joists from moisture to dramatically extend the life of a deck. Here''s some info on the product: https://www.deckbond.com. There''s truly nothing like DeckBond on DIY shelves today, and it has proven incremental and accretive to category sales at retail. To launch, we would only need 5" on your shelf (case pack enables one facing). If you''d like, we''d be happy to stop by to show you this product in person. Just let me know. I really appreciate the opportunity.'
 from campaigns where name = 'DeckBond to Retailers'
 on conflict (campaign_id, step) do nothing;
 

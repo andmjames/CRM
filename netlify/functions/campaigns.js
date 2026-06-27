@@ -32,7 +32,7 @@ const _handler = async (event) => {
     }).select('*').maybeSingle();
     if (error) return json(500, { error: error.message });
     await supabase.from('templates').insert({
-      campaign_id: data.id, step: 1, subject: p.subject || '', body: p.body || 'Hello FIRST_NAME,',
+      campaign_id: data.id, step: 1, subject: p.subject || '', body: p.body || 'GREETING FIRST_NAME,',
     });
     return json(200, { campaign: data });
   }

@@ -1,5 +1,5 @@
 const { supabase, getSettings } = require('./supabase');
-const { nowLocal, rollForward, DateTime } = require('./schedule');
+const { nowLocal, rollForward, DateTime, ZONE } = require('./schedule');
 const { generateColdFollowup } = require('./claude');
 
 // ---- HTTP helpers ----
@@ -45,8 +45,19 @@ function summarizeSamples(samples) {
   return humanJoin(out);
 }
 
-function fillTemplate(body, lead) {
+// "Good morning" before noon, "Good afternoon" from noon on (Indianapolis time
+// of the scheduled send). Defaults to now if no time is given.
+function greetingWord(scheduledForISO) {
+  let hour;
+  try { hour = DateTime.fromISO(scheduledForISO).setZone(ZONE).hour; }
+  catch { hour = nowLocal().hour; }
+  if (scheduledForISO == null) hour = nowLocal().hour;
+  return hour < 12 ? 'Good morning' : 'Good afternoon';
+}
+
+function fillTemplate(body, lead, scheduledForISO) {
   return (body || '')
+    .replace(/GREETING/g, greetingWord(scheduledForISO))
     .replace(/FIRST_NAME/g, lead.first_name || 'there')
     .replace(/SAMPLES/g, summarizeSamples(lead.samples));
 }
@@ -114,7 +125,7 @@ async function enqueueColdEmail1(lead, campaign) {
     step: 1,
     scheduled_for: scheduledFor.toUTC().toISO(),
     subject: tpl?.subject || '',
-    generated_body: fillTemplate(tpl?.body || 'Hello FIRST_NAME,', lead),
+    generated_body: fillTemplate(tpl?.body || 'GREETING FIRST_NAME,', lead, scheduledFor.toUTC().toISO()),
     channel_address: campaign.front_channel_address,
   });
 }
@@ -141,6 +152,13 @@ async function enqueueNextColdEmail({ lead, campaign, justSentStep }) {
   const settings = await getSettings();
   const globalCorrections = settings.global_style_corrections || '';
 
+  const start = Number(settings.send_window_start_hour || 8);
+  const end = Number(settings.send_window_end_hour || 16);
+  const overrides = (lead.interval_overrides && lead.interval_overrides.followup_weeks) || null;
+  const useWeeks = overrides && overrides[nextStep - 2] != null ? overrides[nextStep - 2] : weeks;
+  const scheduledFor = rollForward(nowLocal().plus({ weeks: useWeeks }), start, end, businessDaysOnly(settings));
+  const greeting = greetingWord(scheduledFor.toUTC().toISO());
+
   let gen;
   try {
     gen = await generateColdFollowup({
@@ -150,16 +168,11 @@ async function enqueueNextColdEmail({ lead, campaign, justSentStep }) {
       styleGuide: campaign.style_guide,
       globalCorrections,
       stepNumber: nextStep,
+      greeting,
     });
   } catch (e) {
-    gen = { subject: `Following up`, body: `Hello ${lead.first_name || 'there'}, just following up. — Andrew` };
+    gen = { subject: `Following up`, body: `${greeting} ${lead.first_name || 'there'},\n\nJust following up.` };
   }
-
-  const start = Number(settings.send_window_start_hour || 8);
-  const end = Number(settings.send_window_end_hour || 16);
-  const overrides = (lead.interval_overrides && lead.interval_overrides.followup_weeks) || null;
-  const useWeeks = overrides && overrides[nextStep - 2] != null ? overrides[nextStep - 2] : weeks;
-  const scheduledFor = rollForward(nowLocal().plus({ weeks: useWeeks }), start, end, businessDaysOnly(settings));
 
   await supabase.from('scheduled_actions').insert({
     lead_id: lead.id,

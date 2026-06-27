@@ -27,15 +27,16 @@ function parseJson(text) {
 }
 
 // Generate a cold follow-up (email 2+). Returns { subject, body }.
-async function generateColdFollowup({ campaign, lead, priorEmails, styleGuide, globalCorrections, stepNumber }) {
+async function generateColdFollowup({ campaign, lead, priorEmails, styleGuide, globalCorrections, stepNumber, greeting }) {
   const system = [
     'You write short, genuine B2B outreach follow-up emails for PMI Tape.',
     'Output ONLY valid JSON: {"subject": "...", "body": "..."} with no preamble or markdown.',
     'Vary the wording from previous emails — never repeat phrasing. Add a slightly new angle each time.',
+    greeting ? `Begin the body with this exact greeting line: "${greeting} ${lead.first_name || 'there'},"` : '',
     `Global style rules: ${globalCorrections || ''}`,
     `Campaign style guide: ${styleGuide || ''}`,
     `Product context: ${campaign.product_info || ''}`,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
   const prior = (priorEmails || [])
     .map((e, i) => `--- Email ${i + 1} (subject: ${e.subject})\n${e.body}`)

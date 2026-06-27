@@ -5,7 +5,7 @@ const BLANK = {
   name: '', brand: '', front_channel_address: '', audience_type: 'retailers',
   product_info: '', style_guide: '', first_email_mode: 'immediate', first_email_weeks: 0,
   followup_weeks: '4,6,8,12,16,20,24,28,32,36,40', max_emails: 12, samples_enabled: false,
-  subject: '', body: 'Hello FIRST_NAME,',
+  subject: '', body: 'GREETING FIRST_NAME,',
 };
 
 export default function ManageCampaigns({ notify, onChanged }) {
@@ -26,7 +26,7 @@ export default function ManageCampaigns({ notify, onChanged }) {
     setForm({
       ...c,
       followup_weeks: (c.followup_weeks || []).join(','),
-      subject: tpl.subject || '', body: tpl.body || 'Hello FIRST_NAME,',
+      subject: tpl.subject || '', body: tpl.body || 'GREETING FIRST_NAME,',
     });
     setEditing(c.id);
   }
@@ -86,7 +86,7 @@ export default function ManageCampaigns({ notify, onChanged }) {
             )}
           </div>
           <label className="field"><span>Email 1 subject</span><input value={form.subject} onChange={set('subject')} /></label>
-          <label className="field"><span>Email 1 body — use FIRST_NAME and SAMPLES as placeholders</span><textarea value={form.body} onChange={set('body')} style={{ minHeight: 140 }} /></label>
+          <label className="field"><span>Email 1 body — placeholders: GREETING (Good morning/afternoon by send time), FIRST_NAME, SAMPLES</span><textarea value={form.body} onChange={set('body')} style={{ minHeight: 140 }} /></label>
 
           <div className="divider" />
           <p className="section-title">Follow-ups (AI-generated)</p>

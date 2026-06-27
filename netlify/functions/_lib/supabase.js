@@ -1,4 +1,9 @@
 const { createClient } = require('@supabase/supabase-js');
+// Supply a WebSocket implementation so supabase-js's Realtime client works on
+// Node < 22 (which lacks a native global WebSocket). We don't use Realtime, but
+// the client constructs it regardless, so this prevents a hard startup error.
+let WS = null;
+try { WS = require('ws'); } catch { /* ws optional; native WebSocket used if present */ }
 
 // Lazily create the client so a missing env var produces a clear, catchable
 // error at request time instead of crashing the whole function at import (502).
@@ -11,7 +16,10 @@ function getClient() {
   if (missing.length) {
     throw new Error(`Missing environment variable(s): ${missing.join(', ')}. Set them in Netlify -> Site configuration -> Environment variables, then redeploy.`);
   }
-  _client = createClient(url, key, { auth: { persistSession: false } });
+  _client = createClient(url, key, {
+    auth: { persistSession: false },
+    realtime: WS ? { transport: WS } : undefined,
+  });
   return _client;
 }
 

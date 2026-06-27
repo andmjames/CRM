@@ -15,15 +15,23 @@ The backbone and the cold-email engine:
 ## Coming in later phases (not in this build)
 
 - **Phase 2 — Lead sources:** Apollo chat import, spreadsheet import, Zoho Form intake, saved searches + "Suggested leads to add."
-- **Phase 3 — Reply-aware AI:** Front inbound webhooks, Cold→Dialogue (auto-reply excluded), bounce→Inactive, tag→status (bidirectional), free-form comment commands, Dialogue drafts + Current-Customer comments.
+- **Phase 3 (reactive part — shipped):** Front rule webhook at `/api/front-webhook` — a real reply flips Cold→Dialogue and queues an AI draft reply for your review (auto-replies ignored), tag changes sync to status (and status changes tag the conversation back), free-form comments are interpreted by Claude into actions (pause/resume/stop/status/note), and bounces flip the lead to Inactive + suppress + tag Bounced.
+- **Phase 3 (remaining):** proactive Dialogue draft cadence and Current-Customer scheduled comments.
 - **Phase 4 — Calendar** with per-day push-forward.
 
 ## Setup
 
 1. **Database** — open the Supabase SQL editor for project `zhvfcipveeeybczzmues` and run `supabase/migration.sql`. It creates every table and seeds the four campaigns + Email 1 templates.
-2. **Front** — make sure each sender address (`andrew@pmitape.com`, `andrew@floorbondtape.com`, `andrew@tapegenie.com`, `Andrew@deckbond.com`) exists as a **channel**. Create an API token with scopes `messages:send`, `drafts:write`, and comment access. Note your teammate id (`tea_…`) for `FRONT_AUTHOR_ID`.
-3. **Env vars** (Netlify → Site settings → Environment, and a local `.env` for dev) — copy `.env.example` and fill in `SUPABASE_SERVICE_ROLE_KEY`, `FRONT_API_TOKEN`, `FRONT_AUTHOR_ID`, `ANTHROPIC_API_KEY`, `APP_ACCESS_TOKEN`, and the matching `REACT_APP_ACCESS_TOKEN`.
-4. **Deploy** — push to a GitHub repo under `andmjames`, connect it in Netlify. Build settings come from `netlify.toml` (build `CI= npm run build`, publish `build`, functions `netlify/functions`). The engine schedule is already declared there.
+2. **Front** — make sure each sender address (`andrew@pmitape.com`, `andrew@floorbondtape.com`, `andrew@tapegenie.com`, `Andrew@deckbond.com`) exists as a **channel**. Create an API token with send/draft/comment + tag access. Use `alt:email:you@…` or a `tea_…` id for `FRONT_AUTHOR_ID`.
+3. **Env vars** (Netlify → Site settings → Environment) — copy `.env.example` and fill in `SUPABASE_SERVICE_ROLE_KEY`, `FRONT_API_TOKEN`, `FRONT_AUTHOR_ID`, `ANTHROPIC_API_KEY`, `APP_ACCESS_TOKEN`, the matching `REACT_APP_ACCESS_TOKEN`, and (for Phase 3) `FRONT_WEBHOOK_SECRET`.
+4. **Deploy** — push to a GitHub repo under `andmjames`, connect it in Netlify. Build settings come from `netlify.toml`. The engine schedule is already declared there.
+
+## Front webhook setup (Phase 3)
+
+1. **Create the tags** in Front (names must match exactly): `Cold`, `Dialogue`, `Current Customer`, `Inactive`, `Pause`, `Do Not Contact`, `Bounced`.
+2. **Install the Webhooks app** (Front → Settings → App Store → Webhooks → Configure) and copy its **API secret** into `FRONT_WEBHOOK_SECRET`.
+3. **Create rules** that send to `https://YOUR-SITE.netlify.app/api/front-webhook` on: inbound messages (on the four brand channels), comment added, tag added, and delivery failure/bounce.
+4. **Heads-up on payload shapes:** Front's rule-webhook body differs by trigger. The handler extracts fields defensively and logs any event it can't classify (Netlify → Functions → `front-webhook` logs). If something isn't being picked up, grab one logged sample and the field paths can be tuned in minutes.
 
 ## Look & feel
 

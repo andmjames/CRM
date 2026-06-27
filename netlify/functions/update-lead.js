@@ -38,6 +38,21 @@ const _handler = async (event) => {
       .eq('lead_id', id).in('status', ['pending']);
   }
 
+  // Best-effort: mirror a status change onto the Front conversation tags (if the
+  // lead has a linked conversation). Non-blocking — never fails the update.
+  if (status && lead?.front_conversation_id) {
+    const TAG = { cold: 'Cold', dialogue: 'Dialogue', current_customer: 'Current Customer', inactive: 'Inactive' };
+    (async () => {
+      try {
+        const front = require('./_lib/front');
+        await front.applyTag(lead.front_conversation_id, TAG[status]);
+        for (const [k, name] of Object.entries(TAG)) {
+          if (k !== status) front.removeTag(lead.front_conversation_id, name).catch(() => {});
+        }
+      } catch { /* ignore */ }
+    })();
+  }
+
   return json(200, { lead });
 };
 

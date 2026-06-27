@@ -4,6 +4,7 @@
 const { supabase } = require('./_lib/supabase');
 const { nowLocal } = require('./_lib/schedule');
 const { enqueueNextColdEmail } = require('./_lib/core');
+const { generateReply } = require('./_lib/claude');
 const front = require('./_lib/front');
 
 const MAX_PER_RUN = 25; // safety cap per invocation
@@ -38,17 +39,35 @@ async function perform(action) {
       body: action.generated_body,
     });
   } else if (action.action_type === 'draft') {
+    // Reply-aware: if no body was pre-generated, draft one from the live thread.
+    let body = action.generated_body;
+    if (!body && lead.front_conversation_id) {
+      let threadText = '';
+      try { threadText = await front.getThreadText(lead.front_conversation_id); } catch { /* ignore */ }
+      const { data: settings } = await supabase.from('settings').select('key,value');
+      const map = Object.fromEntries((settings || []).map((r) => [r.key, r.value]));
+      try {
+        const gen = await generateReply({
+          kind: 'draft',
+          campaign,
+          lead,
+          threadText,
+          firstNames: [lead.first_name].filter(Boolean),
+          styleGuide: campaign.style_guide,
+          globalCorrections: map.global_style_corrections || '',
+        });
+        body = gen.body || '';
+      } catch { body = `Hi ${lead.first_name || 'there'},\n\n`; }
+      await supabase.from('scheduled_actions').update({ generated_body: body }).eq('id', action.id);
+    }
     if (lead.front_conversation_id) {
-      result = await front.createDraftReply({
-        conversationId: lead.front_conversation_id,
-        body: action.generated_body,
-      });
+      result = await front.createDraftReply({ conversationId: lead.front_conversation_id, body });
     } else {
       result = await front.createDraft({
         channelAddress: action.channel_address,
         to: lead.email,
         subject: action.subject || 'Following up',
-        body: action.generated_body,
+        body,
       });
     }
   } else if (action.action_type === 'comment') {

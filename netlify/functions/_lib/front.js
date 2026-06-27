@@ -95,10 +95,58 @@ async function findConversationByEmail(email) {
   return (json._results && json._results[0]) || null;
 }
 
+// --- Tags ---
+let _tagCache = null;
+async function listTags() {
+  if (_tagCache) return _tagCache;
+  const json = await frontFetch('/tags');
+  _tagCache = json._results || [];
+  return _tagCache;
+}
+async function tagIdByName(name) {
+  const tags = await listTags();
+  const t = tags.find((x) => (x.name || '').toLowerCase() === String(name).toLowerCase());
+  return t ? t.id : null;
+}
+async function applyTag(conversationId, tagName) {
+  const id = await tagIdByName(tagName);
+  if (!id) return null;
+  return frontFetch(`/conversations/${conversationId}/tags`, {
+    method: 'POST', body: JSON.stringify({ tag_ids: [id] }),
+  });
+}
+async function removeTag(conversationId, tagName) {
+  const id = await tagIdByName(tagName);
+  if (!id) return null;
+  return frontFetch(`/conversations/${conversationId}/tags`, {
+    method: 'DELETE', body: JSON.stringify({ tag_ids: [id] }),
+  });
+}
+
+// --- Conversation context ---
+async function getMessages(conversationId) {
+  const json = await frontFetch(`/conversations/${conversationId}/messages`);
+  return json._results || [];
+}
+// Best-effort: pull readable text from the most recent inbound messages.
+async function getThreadText(conversationId, limit = 3) {
+  const msgs = await getMessages(conversationId);
+  return msgs.slice(0, limit).map((m) => {
+    const who = m.is_inbound ? 'Them' : 'Us';
+    const body = (m.text || m.body || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return `${who}: ${body}`;
+  }).reverse().join('\n');
+}
+
 module.exports = {
   sendMessage,
   createDraft,
   createDraftReply,
   createComment,
   findConversationByEmail,
+  listTags,
+  applyTag,
+  removeTag,
+  getMessages,
+  getThreadText,
 };

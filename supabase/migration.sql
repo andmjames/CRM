@@ -155,7 +155,8 @@ insert into settings (key, value) values
   ('send_window_start_hour', '8'),
   ('send_window_end_hour', '16'),
   ('stagger_seconds_min', '60'),
-  ('stagger_seconds_max', '120')
+  ('stagger_seconds_max', '120'),
+  ('business_days_only', 'true')
 on conflict (key) do nothing;
 
 -- Campaigns

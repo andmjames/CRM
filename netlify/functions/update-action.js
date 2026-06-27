@@ -1,6 +1,6 @@
 // update-action.js — edit/preview-edit or cancel a single pending scheduled action.
 // Editing a lead's upcoming email here only affects that lead (per-lead override).
-const { supabase } = require('./_lib/supabase');
+const { supabase, getSettings } = require('./_lib/supabase');
 const { json, requireAuth } = require('./_lib/core');
 const { rollForward, nowLocal, DateTime, ZONE } = require('./_lib/schedule');
 
@@ -22,9 +22,12 @@ const _handler = async (event) => {
   if (subject !== undefined) patch.subject = subject;
   if (body !== undefined) patch.generated_body = body;
   if (scheduled_for_date) {
-    // Interpret the date as 8am local, then roll forward to a valid business day.
+    // Interpret the date as 8am local; roll forward to a business day unless the
+    // weekday/holiday restriction is toggled off.
+    const settings = await getSettings();
+    const bdo = (settings.business_days_only ?? 'true') !== 'false';
     const dt = DateTime.fromISO(scheduled_for_date, { zone: ZONE }).set({ hour: 8 });
-    patch.scheduled_for = rollForward(dt).toUTC().toISO();
+    patch.scheduled_for = rollForward(dt, 8, 16, bdo).toUTC().toISO();
   }
 
   const { data, error } = await supabase.from('scheduled_actions')

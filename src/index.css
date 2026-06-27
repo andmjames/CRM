@@ -157,6 +157,11 @@ input:focus, textarea:focus, select:focus { border-color: var(--text); }
 .manage-link button { background: none; border: 0; color: var(--text2); font-weight: 500; font-size: 13px; }
 .manage-link button:hover { color: var(--text); }
 .empty { text-align: center; color: var(--text2); padding: 40px 20px; }
+.linklike { background: none; border: 0; padding: 0; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.linklike:hover { color: var(--text2); }
+.auto-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: .5px solid var(--border); cursor: pointer; }
+.auto-row:first-of-type { border-top: none; }
+.auto-row:hover { background: var(--bg2); margin: 0 -10px; padding-left: 10px; padding-right: 10px; border-radius: 6px; }
 
 @media (max-width: 768px) {
   .detail-grid { grid-template-columns: 1fr; }

@@ -2,13 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './api';
 import { LOGO_SRC } from './logo';
 import Dashboard from './components/Dashboard';
+import Leads from './components/Leads';
+import UpcomingEmails from './components/UpcomingEmails';
 import LeadDetail from './components/LeadDetail';
 import ManageCampaigns from './components/ManageCampaigns';
 import SettingsPanel from './components/SettingsPanel';
 import AddLeadModal from './components/AddLeadModal';
 
 export default function App() {
-  const [view, setView] = useState('home'); // home | manage | settings
+  const [view, setView] = useState('home'); // home | leads | upcoming | manage | settings
   const [leadId, setLeadId] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -33,7 +35,12 @@ export default function App() {
   function openLead(id) { setLeadId(id); }
   function go(v) { setLeadId(null); setView(v); }
 
-  const pageTitle = leadId ? 'Lead' : view === 'home' ? 'Outreach' : view === 'manage' ? 'Campaigns' : 'Settings';
+  const TITLES = { home: 'CRM', leads: 'Leads', upcoming: 'Upcoming emails', manage: 'Campaigns', settings: 'Settings' };
+  const pageTitle = leadId ? 'Lead' : (TITLES[view] || 'CRM');
+
+  const tab = (key, label) => (
+    <button className={view === key && !leadId ? 'active' : ''} onClick={() => go(key)}>{label}</button>
+  );
 
   return (
     <>
@@ -42,9 +49,11 @@ export default function App() {
         <span className="header-divider" />
         <span className="header-page-title">{pageTitle}</span>
         <nav>
-          <button className={view === 'home' && !leadId ? 'active' : ''} onClick={() => go('home')}>Dashboard</button>
-          <button className={view === 'manage' ? 'active' : ''} onClick={() => go('manage')}>Campaigns</button>
-          <button className={view === 'settings' ? 'active' : ''} onClick={() => go('settings')}>Settings</button>
+          {tab('home', 'Dashboard')}
+          {tab('leads', 'Leads')}
+          {tab('upcoming', 'Upcoming')}
+          {tab('manage', 'Campaigns')}
+          {tab('settings', 'Settings')}
         </nav>
         <div className="spacer" />
         <button className="btn accent sm" onClick={() => setAdding(true)}>+ Add lead</button>
@@ -60,10 +69,15 @@ export default function App() {
               id={leadId}
               onBack={() => setLeadId(null)}
               onChanged={() => { load(); }}
+              onDeleted={() => { setLeadId(null); load(); notify('Lead deleted.'); }}
               notify={notify}
             />
           ) : view === 'home' ? (
-            <Dashboard data={data} onOpenLead={openLead} onManage={() => go('manage')} />
+            <Dashboard data={data} onOpenLead={openLead} onViewUpcoming={() => go('upcoming')} />
+          ) : view === 'leads' ? (
+            <Leads data={data} onOpenLead={openLead} />
+          ) : view === 'upcoming' ? (
+            <UpcomingEmails onOpenLead={openLead} notify={notify} />
           ) : view === 'manage' ? (
             <ManageCampaigns notify={notify} onChanged={load} />
           ) : (

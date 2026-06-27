@@ -9,6 +9,7 @@ export default function SettingsPanel({ notify }) {
   if (!s) return <div className="empty">Loading…</div>;
 
   const set = (k) => (e) => setS({ ...s, [k]: e.target.value });
+  const setBool = (k) => (e) => setS({ ...s, [k]: e.target.checked ? 'true' : 'false' });
 
   async function save() {
     setBusy(true);
@@ -19,8 +20,9 @@ export default function SettingsPanel({ notify }) {
         send_window_end_hour: s.send_window_end_hour || '16',
         stagger_seconds_min: s.stagger_seconds_min || '60',
         stagger_seconds_max: s.stagger_seconds_max || '120',
+        business_days_only: (s.business_days_only ?? 'true') === 'false' ? 'false' : 'true',
       });
-      notify('Settings saved — applies to future AI-generated messages.');
+      notify('Settings saved.');
     } catch (e) { notify(e.message); } finally { setBusy(false); }
   }
 
@@ -43,7 +45,21 @@ export default function SettingsPanel({ notify }) {
           <label className="field" style={{ width: 150 }}><span>Min gap (sec)</span><input type="number" value={s.stagger_seconds_min || '60'} onChange={set('stagger_seconds_min')} /></label>
           <label className="field" style={{ width: 150 }}><span>Max gap (sec)</span><input type="number" value={s.stagger_seconds_max || '120'} onChange={set('stagger_seconds_max')} /></label>
         </div>
-        <p className="muted-sm">All times in America/Indiana/Indianapolis. Sends only happen on weekdays, never on your holiday list.</p>
+        <label className="row" style={{ gap: 9, marginTop: 14, alignItems: 'flex-start' }}>
+          <input
+            type="checkbox"
+            style={{ width: 'auto', marginTop: 3 }}
+            checked={(s.business_days_only ?? 'true') !== 'false'}
+            onChange={setBool('business_days_only')}
+          />
+          <span>
+            <strong style={{ fontWeight: 600 }}>Send emails on weekdays and non-holidays only</strong>
+            <span className="muted-sm" style={{ display: 'block', marginTop: 2 }}>
+              On by default. Uncheck to let sends fire immediately regardless of weekend, holiday, or send window — useful for testing.
+            </span>
+          </span>
+        </label>
+        <p className="muted-sm" style={{ marginTop: 12 }}>All times in America/Indiana/Indianapolis.</p>
       </div>
 
       <div className="row" style={{ marginTop: 16 }}>

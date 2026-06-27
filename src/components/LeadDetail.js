@@ -19,7 +19,7 @@ function dateInput(iso) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Indiana/Indianapolis' });
 }
 
-export default function LeadDetail({ id, onBack, onChanged, notify }) {
+export default function LeadDetail({ id, onBack, onChanged, onDeleted, notify }) {
   const [d, setD] = useState(null);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -48,6 +48,12 @@ export default function LeadDetail({ id, onBack, onChanged, notify }) {
     finally { setSaving(false); }
   }
 
+  async function removeLead() {
+    if (!window.confirm(`Delete ${lead.first_name || lead.email} permanently? This cancels any queued emails and can't be undone.`)) return;
+    try { await api.deleteLead(id); onDeleted && onDeleted(); }
+    catch (e) { notify(e.message); }
+  }
+
   function toggleSample(s) {
     const next = lead.samples.includes(s) ? lead.samples.filter((x) => x !== s) : [...lead.samples, s];
     patchLead({ samples: next });
@@ -58,6 +64,8 @@ export default function LeadDetail({ id, onBack, onChanged, notify }) {
       <button className="back" onClick={onBack}>← Back to dashboard</button>
       <div className="row" style={{ marginBottom: 4 }}>
         <h1 style={{ margin: 0 }}>{[lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email}</h1>
+        <div className="spacer" />
+        <button className="btn ghost sm danger" onClick={removeLead}>Delete lead</button>
       </div>
       <p className="sub" style={{ marginBottom: 18 }}>
         {lead.email} · {companyName || 'No company'} · {campaign?.name}

@@ -75,7 +75,6 @@ export default function Dashboard({ data, onOpenLead, onViewUpcoming, onSelectCa
         <div className="stat"><div className="n" style={{ color: 'var(--current)' }}>{stats.byStatus.cold || 0}</div><div className="l">Cold</div></div>
         <div className="stat"><div className="n" style={{ color: 'var(--current)' }}>{stats.byStatus.dialogue || 0}</div><div className="l">In dialogue</div></div>
         <div className="stat"><div className="n" style={{ color: 'var(--current)' }}>{stats.byStatus.current_customer || 0}</div><div className="l">Current customers</div></div>
-        <div className="stat"><div className="n" style={{ color: 'var(--success)' }}>{stats.sendsNext7Days}</div><div className="l">Sends next 7 days</div></div>
       </div>
 
       {/* Leads by campaign */}

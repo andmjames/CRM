@@ -2,7 +2,7 @@
 const { supabase } = require('./_lib/supabase');
 const { json, requireAuth } = require('./_lib/core');
 
-exports.handler = async (event) => {
+const _handler = async (event) => {
   if (!requireAuth(event)) return json(401, { error: 'unauthorized' });
   const method = event.httpMethod;
 
@@ -64,3 +64,5 @@ exports.handler = async (event) => {
 
   return json(405, { error: 'method not allowed' });
 };
+
+exports.handler = require('./_lib/core').safe(_handler);

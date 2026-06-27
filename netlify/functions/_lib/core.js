@@ -145,8 +145,20 @@ async function enqueueNextColdEmail({ lead, campaign, justSentStep }) {
   });
 }
 
+// Wrap a handler so any thrown error becomes a readable JSON 500 instead of a 502.
+function safe(handler) {
+  return async (event, context) => {
+    try {
+      return await handler(event, context);
+    } catch (e) {
+      return json(500, { error: e && e.message ? e.message : String(e) });
+    }
+  };
+}
+
 module.exports = {
   json,
+  safe,
   requireAuth,
   fillTemplate,
   nextStaggeredSlot,

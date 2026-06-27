@@ -4,7 +4,7 @@ const { json, requireAuth } = require('./_lib/core');
 
 const VALID_STATUS = ['cold', 'dialogue', 'current_customer', 'inactive'];
 
-exports.handler = async (event) => {
+const _handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'POST only' });
   if (!requireAuth(event)) return json(401, { error: 'unauthorized' });
 
@@ -40,3 +40,5 @@ exports.handler = async (event) => {
 
   return json(200, { lead });
 };
+
+exports.handler = require('./_lib/core').safe(_handler);

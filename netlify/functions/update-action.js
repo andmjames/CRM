@@ -4,7 +4,7 @@ const { supabase } = require('./_lib/supabase');
 const { json, requireAuth } = require('./_lib/core');
 const { rollForward, nowLocal, DateTime, ZONE } = require('./_lib/schedule');
 
-exports.handler = async (event) => {
+const _handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'POST only' });
   if (!requireAuth(event)) return json(401, { error: 'unauthorized' });
 
@@ -33,3 +33,5 @@ exports.handler = async (event) => {
   if (!data) return json(409, { error: 'action not editable (already sent or canceled)' });
   return json(200, { action: data });
 };
+
+exports.handler = require('./_lib/core').safe(_handler);

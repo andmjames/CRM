@@ -79,7 +79,7 @@ async function perform(action) {
   }
 }
 
-exports.handler = async () => {
+const _handler = async () => {
   const dueBefore = nowLocal().toUTC().toISO();
   const { data: due, error } = await supabase
     .from('scheduled_actions')
@@ -108,3 +108,5 @@ exports.handler = async () => {
 
   return { statusCode: 200, body: JSON.stringify({ processed, failed, considered: (due || []).length }) };
 };
+
+exports.handler = require('./_lib/core').safe(_handler);

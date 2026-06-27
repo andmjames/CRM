@@ -2,7 +2,7 @@
 const { supabase } = require('./_lib/supabase');
 const { json, requireAuth } = require('./_lib/core');
 
-exports.handler = async (event) => {
+const _handler = async (event) => {
   if (!requireAuth(event)) return json(401, { error: 'unauthorized' });
   const id = event.queryStringParameters?.id;
   if (!id) return json(400, { error: 'id required' });
@@ -31,3 +31,5 @@ exports.handler = async (event) => {
     history: history || [],
   });
 };
+
+exports.handler = require('./_lib/core').safe(_handler);

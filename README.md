@@ -34,3 +34,4 @@ The UI is matched to the Equipment Troubleshooting app: same monochrome design t
 - The Front client (`netlify/functions/_lib/front.js`) is written to Front's documented API. Confirm the channel send + draft-reply payloads against your workspace on the first send; Front occasionally wants `to[0]` form-encoding rather than a JSON array.
 - The engine kicks itself on lead creation so immediate first emails go promptly; otherwise it catches them within ~5 minutes.
 - Editing an upcoming email on a lead marks it as a per-lead override and won't be overwritten by global regeneration.
+- Outbound emails ask Front to append your **default signature** (`should_add_default_signature`). For this to attach a *personal* signature, the API token may need the "Private Resources" scope (shared/channel signatures work without it). To pin one specific signature, set `FRONT_SIGNATURE_ID`.

@@ -30,6 +30,13 @@ function channelAlias(address) {
   return `alt:address:${encodeURIComponent(address)}`;
 }
 
+// Signature attachment. By default Front picks the channel/teammate default
+// signature. Set FRONT_SIGNATURE_ID to force a specific one.
+function signatureFields() {
+  const id = process.env.FRONT_SIGNATURE_ID;
+  return id ? { signature_id: id } : { should_add_default_signature: true };
+}
+
 // Send an outbound email from a channel (Cold leads). Creates + sends.
 async function sendMessage({ channelAddress, to, subject, body }) {
   return frontFetch(`/channels/${channelAlias(channelAddress)}/messages`, {
@@ -39,6 +46,7 @@ async function sendMessage({ channelAddress, to, subject, body }) {
       subject,
       body,                 // plain text / HTML
       author_id: process.env.FRONT_AUTHOR_ID,
+      ...signatureFields(),
       options: { archive: false },
     }),
   });
@@ -53,6 +61,7 @@ async function createDraft({ channelAddress, to, subject, body }) {
       subject,
       body,
       author_id: process.env.FRONT_AUTHOR_ID,
+      ...signatureFields(),
     }),
   });
 }
@@ -66,6 +75,7 @@ async function createDraftReply({ conversationId, channelAddress, body, to }) {
       to: to && (Array.isArray(to) ? to : [to]),
       body,
       author_id: process.env.FRONT_AUTHOR_ID,
+      ...signatureFields(),
     }),
   });
 }

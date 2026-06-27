@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
 const STATUS_LABEL = { cold: 'Cold', dialogue: 'Dialogue', current_customer: 'Current customer', inactive: 'Inactive' };
 const STATUS_ORDER = { cold: 0, dialogue: 1, current_customer: 2, inactive: 3 };
@@ -7,9 +7,13 @@ function StatusPill({ status }) {
   return <span className={`pill ${status}`}>{STATUS_LABEL[status] || status}</span>;
 }
 
-export default function Leads({ data, onOpenLead }) {
+export default function Leads({ data, onOpenLead, campaignFilter, onAddLead }) {
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [campaignSel, setCampaignSel] = useState(campaignFilter || 'all');
+
+  // Sync when arriving from a dashboard campaign click.
+  useEffect(() => { setCampaignSel(campaignFilter || 'all'); }, [campaignFilter]);
 
   const campaignName = useMemo(() => Object.fromEntries((data.campaigns || []).map((c) => [c.id, c.name])), [data]);
   const companyName = useMemo(() => Object.fromEntries((data.companies || []).map((c) => [c.id, c.name])), [data]);
@@ -17,6 +21,7 @@ export default function Leads({ data, onOpenLead }) {
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return (data.leads || [])
+      .filter((l) => campaignSel === 'all' || l.campaign_id === campaignSel)
       .filter((l) => statusFilter === 'all' || l.status === statusFilter)
       .filter((l) => {
         if (!needle) return true;
@@ -31,17 +36,18 @@ export default function Leads({ data, onOpenLead }) {
         if (s !== 0) return s;
         return [a.first_name, a.last_name].join(' ').localeCompare([b.first_name, b.last_name].join(' '));
       });
-  }, [data, q, statusFilter, campaignName, companyName]);
+  }, [data, q, statusFilter, campaignSel, campaignName, companyName]);
 
   return (
     <>
       <div className="row">
         <h1 style={{ margin: 0 }}>All leads</h1>
         <div className="spacer" />
-        <span className="muted-sm">{rows.length} of {(data.leads || []).length}</span>
+        <span className="muted-sm" style={{ marginRight: 12 }}>{rows.length} of {(data.leads || []).length}</span>
+        <button className="btn accent sm" onClick={onAddLead}>+ Add lead</button>
       </div>
 
-      <div className="row" style={{ gap: 10, margin: '14px 0 16px' }}>
+      <div className="row" style={{ gap: 10, margin: '14px 0 16px', flexWrap: 'wrap' }}>
         <input
           autoFocus
           placeholder="Search name, email, company, or campaign…"
@@ -49,6 +55,10 @@ export default function Leads({ data, onOpenLead }) {
           onChange={(e) => setQ(e.target.value)}
           style={{ flex: 1, minWidth: 220 }}
         />
+        <select value={campaignSel} onChange={(e) => setCampaignSel(e.target.value)} style={{ width: 200 }}>
+          <option value="all">All campaigns</option>
+          {(data.campaigns || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ width: 180 }}>
           <option value="all">All statuses</option>
           <option value="cold">Cold</option>

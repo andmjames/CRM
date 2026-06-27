@@ -162,6 +162,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--text); }
 .auto-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: .5px solid var(--border); cursor: pointer; }
 .auto-row:first-of-type { border-top: none; }
 .auto-row:hover { background: var(--bg2); margin: 0 -10px; padding-left: 10px; padding-right: 10px; border-radius: 6px; }
+.legend-row:hover { background: var(--bg2); }
 
 @media (max-width: 768px) {
   .detail-grid { grid-template-columns: 1fr; }

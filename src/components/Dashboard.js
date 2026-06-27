@@ -7,8 +7,16 @@ function fmtWhen(iso) {
 }
 function typeLabel(t) { return t === 'send' ? 'Email' : t === 'draft' ? 'Draft' : 'Comment'; }
 
-// Distinct, tasteful slice colors (assigned per campaign by order).
-const PALETTE = ['#2f5d8a', '#3b6d11', '#b8860b', '#a32d2d', '#5b4b8a', '#0f766e'];
+// Per-brand slice colors. Matched by brand/name so order doesn't matter.
+const FALLBACK = ['#5b4b8a', '#0f766e', '#a32d2d', '#b8860b'];
+function colorForCampaign(c, i) {
+  const hay = `${c.brand || ''} ${c.name || ''}`.toLowerCase();
+  if (hay.includes('floorbond')) return '#E6A700';      // FloorBond — yellow
+  if (hay.includes('tape genie') || hay.includes('tapegenie')) return '#2F9E44'; // Tape Genie — green
+  if (hay.includes('deckbond')) return '#6B7280';       // DeckBond — gray
+  if (hay.includes('pmi')) return '#2F5D8A';            // PMI — blue
+  return FALLBACK[i % FALLBACK.length];
+}
 
 function LeadsDonut({ slices, total }) {
   const radius = 70, stroke = 26, cx = 100, cy = 100;
@@ -36,7 +44,7 @@ function LeadsDonut({ slices, total }) {
   );
 }
 
-export default function Dashboard({ data, onOpenLead, onViewUpcoming }) {
+export default function Dashboard({ data, onOpenLead, onViewUpcoming, onSelectCampaign }) {
   const { campaigns, leads, stats } = data;
   const [upcoming, setUpcoming] = useState(null);
 
@@ -50,7 +58,7 @@ export default function Dashboard({ data, onOpenLead, onViewUpcoming }) {
   leads.forEach((l) => { countByCampaign[l.campaign_id] = (countByCampaign[l.campaign_id] || 0) + 1; });
 
   const campaignCounts = campaigns.map((c, i) => ({
-    id: c.id, label: c.name, value: countByCampaign[c.id] || 0, color: PALETTE[i % PALETTE.length],
+    id: c.id, label: c.name, value: countByCampaign[c.id] || 0, color: colorForCampaign(c, i),
   }));
   const pieSlices = campaignCounts.filter((s) => s.value > 0);
   const totalLeads = campaignCounts.reduce((s, x) => s + x.value, 0);
@@ -77,10 +85,17 @@ export default function Dashboard({ data, onOpenLead, onViewUpcoming }) {
           <LeadsDonut slices={pieSlices} total={totalLeads} />
           <div style={{ flex: 1, minWidth: 220 }}>
             {campaignCounts.map((s) => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '.5px solid var(--border)' }}>
+              <div
+                key={s.id}
+                className="legend-row"
+                onClick={() => onSelectCampaign && onSelectCampaign(s.id)}
+                title={`View ${s.label} leads`}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px', margin: '0 -8px', borderRadius: 6, cursor: 'pointer' }}
+              >
                 <span style={{ width: 12, height: 12, borderRadius: 3, background: s.value > 0 ? s.color : 'var(--border)', flex: '0 0 auto' }} />
                 <span style={{ flex: 1, fontWeight: 500 }}>{s.label}</span>
                 <span className="muted-sm">{s.value} {s.value === 1 ? 'lead' : 'leads'}</span>
+                <span className="muted-sm" aria-hidden="true">›</span>
               </div>
             ))}
             {totalLeads === 0 && (

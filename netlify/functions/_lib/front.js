@@ -37,9 +37,10 @@ function signatureFields() {
   return id ? { signature_id: id } : { should_add_default_signature: true };
 }
 
-// Front renders the message body as HTML and appends the signature right after
-// it, so plain newlines collapse. Convert the (plain-text) body to HTML — escape
-// entities, turn newlines into <br>, and add one blank line before the signature.
+// Front renders the message body as HTML and appends the signature (its own
+// block, which carries a bit of leading space) right after. Convert the
+// plain-text body to HTML and end with a single <br> so there's exactly one
+// blank line before the signature.
 function withSignatureGap(body) {
   const trimmed = String(body || '').replace(/\s+$/, '');
   const html = trimmed
@@ -47,7 +48,7 @@ function withSignatureGap(body) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br>');
-  return `${html}<br><br>`;
+  return `${html}<br>`;
 }
 
 // Send an outbound email from a channel (Cold leads). Creates + sends.

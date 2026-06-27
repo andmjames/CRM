@@ -11,6 +11,7 @@ import AddLeadModal from './components/AddLeadModal';
 export default function App() {
   const [view, setView] = useState('home'); // home | leads | upcoming | settings
   const [leadId, setLeadId] = useState(null);
+  const [leadsFilter, setLeadsFilter] = useState(null); // campaign id, or null for all
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -32,7 +33,8 @@ export default function App() {
   useEffect(() => { load(); }, [load]);
 
   function openLead(id) { setLeadId(id); }
-  function go(v) { setLeadId(null); setView(v); }
+  function go(v) { setLeadId(null); setLeadsFilter(null); setView(v); }
+  function goLeadsForCampaign(campaignId) { setLeadId(null); setLeadsFilter(campaignId || null); setView('leads'); }
 
   const tab = (key, label) => (
     <button className={view === key && !leadId ? 'active' : ''} onClick={() => go(key)}>{label}</button>
@@ -51,7 +53,6 @@ export default function App() {
           {tab('settings', 'Settings')}
         </nav>
         <div className="spacer" />
-        <button className="btn accent sm" onClick={() => setAdding(true)}>+ Add lead</button>
       </header>
 
       <div className="container">
@@ -68,9 +69,9 @@ export default function App() {
               notify={notify}
             />
           ) : view === 'home' ? (
-            <Dashboard data={data} onOpenLead={openLead} onViewUpcoming={() => go('upcoming')} />
+            <Dashboard data={data} onOpenLead={openLead} onViewUpcoming={() => go('upcoming')} onSelectCampaign={goLeadsForCampaign} />
           ) : view === 'leads' ? (
-            <Leads data={data} onOpenLead={openLead} />
+            <Leads data={data} onOpenLead={openLead} campaignFilter={leadsFilter} onAddLead={() => setAdding(true)} />
           ) : view === 'upcoming' ? (
             <UpcomingEmails onOpenLead={openLead} notify={notify} />
           ) : (

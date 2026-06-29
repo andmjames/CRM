@@ -137,6 +137,24 @@ async function removeTag(conversationId, tagName) {
   });
 }
 
+// Keep the Front conversation tagged with the lead's current status (one of the
+// four), removing the others so the status is unambiguous when viewed in Front.
+const STATUS_TAG_NAME = { cold: 'Cold', dialogue: 'Dialogue', current_customer: 'Current Customer', inactive: 'Inactive' };
+async function syncStatusTag(conversationId, status) {
+  const name = STATUS_TAG_NAME[status];
+  if (!conversationId || !name) return;
+  try { await applyTag(conversationId, name); } catch { /* ignore */ }
+  for (const [k, n] of Object.entries(STATUS_TAG_NAME)) {
+    if (k !== status) { try { await removeTag(conversationId, n); } catch { /* ignore */ } }
+  }
+}
+
+// Pull a cnv_ id out of any Front API response (e.g. after sending a message).
+function extractConversationId(result) {
+  const m = JSON.stringify(result || '').match(/cnv_[A-Za-z0-9]+/);
+  return m ? m[0] : null;
+}
+
 // --- Conversation context ---
 async function getConversation(conversationId) {
   return frontFetch(`/conversations/${conversationId}`);
@@ -164,6 +182,8 @@ module.exports = {
   listTags,
   applyTag,
   removeTag,
+  syncStatusTag,
+  extractConversationId,
   getConversation,
   getMessages,
   getThreadText,

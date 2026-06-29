@@ -196,7 +196,7 @@ exports.handler = async (event) => {
         let cmd;
         try { cmd = await generateCommandFromComment({ commentText: text, lead, campaign }); }
         catch { cmd = { action: 'none' }; }
-        await applyCommand(cmd, lead);
+        await applyCommand(cmd, lead, cId || lead.front_conversation_id);
       }
       return json(200, { ok: true, handled: 'comment', matched: !!lead });
     }
@@ -217,6 +217,9 @@ exports.handler = async (event) => {
         if (lead.status === 'cold') { patch.status = 'dialogue'; }
         await supabase.from('leads').update(patch).eq('id', lead.id);
         if (lead.status === 'cold') await cancelPendingSends(lead.id);
+        if ((cId || lead.front_conversation_id) && patch.status) {
+          front.syncStatusTag(cId || lead.front_conversation_id, patch.status).catch(() => {});
+        }
 
         // Queue a draft for the engine to generate with thread context.
         const { data: campaign } = await supabase.from('campaigns').select('front_channel_address').eq('id', lead.campaign_id).maybeSingle();
@@ -246,7 +249,7 @@ exports.handler = async (event) => {
         await supabase.from('leads').update({ status: 'inactive' }).eq('id', lead.id);
         await cancelPendingSends(lead.id);
         await supabase.from('suppression_list').upsert({ email: lead.email, reason: 'bounced' }, { onConflict: 'email' });
-        if (cId) front.applyTag(cId, 'Bounced').catch(() => {});
+        if (cId) { front.applyTag(cId, 'Bounced').catch(() => {}); front.syncStatusTag(cId, 'inactive').catch(() => {}); }
       }
       return json(200, { ok: true, handled: 'bounce', matched: !!lead });
     }
@@ -261,7 +264,7 @@ exports.handler = async (event) => {
   }
 };
 
-async function applyCommand(cmd, lead) {
+async function applyCommand(cmd, lead, cId) {
   switch (cmd.action) {
     case 'pause':
       await supabase.from('leads').update({ paused: true }).eq('id', lead.id);
@@ -273,12 +276,14 @@ async function applyCommand(cmd, lead) {
       if (['cold', 'dialogue', 'current_customer', 'inactive'].includes(cmd.status)) {
         await supabase.from('leads').update({ status: cmd.status }).eq('id', lead.id);
         if (cmd.status !== 'cold') await cancelPendingSends(lead.id);
+        if (cId) front.syncStatusTag(cId, cmd.status).catch(() => {});
       }
       break;
     case 'stop':
       await supabase.from('leads').update({ status: 'inactive', paused: true }).eq('id', lead.id);
       await cancelPendingSends(lead.id);
       await supabase.from('suppression_list').upsert({ email: lead.email, reason: 'comment command: stop' }, { onConflict: 'email' });
+      if (cId) front.syncStatusTag(cId, 'inactive').catch(() => {});
       break;
     case 'note': {
       const note = (lead.notes ? lead.notes + '\n' : '') + (cmd.note || '');

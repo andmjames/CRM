@@ -38,6 +38,16 @@ async function perform(action) {
       subject: action.subject,
       body: action.generated_body,
     });
+    // Link the Front conversation on first send so its status shows in Front.
+    if (!lead.front_conversation_id) {
+      let cid = front.extractConversationId(result);
+      if (!cid) { try { const c = await front.findConversationByEmail(lead.email); cid = c && c.id; } catch { /* ignore */ } }
+      if (cid) {
+        lead.front_conversation_id = cid;
+        await supabase.from('leads').update({ front_conversation_id: cid }).eq('id', lead.id);
+        front.syncStatusTag(cid, 'cold').catch(() => {});
+      }
+    }
   } else if (action.action_type === 'draft') {
     // Reply-aware: if no body was pre-generated, draft one from the live thread.
     let body = action.generated_body;

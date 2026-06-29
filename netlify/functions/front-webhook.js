@@ -76,48 +76,121 @@ async function cancelPendingSends(leadId) {
     .eq('lead_id', leadId).eq('action_type', 'send').eq('status', 'pending');
 }
 
+// Rule webhooks nest fields differently than app webhooks and the recipient is
+// only present with "Send Full Event Data" on — so search the whole payload.
+function deepCollect(obj, test, acc = []) {
+  if (obj == null) return acc;
+  if (typeof obj === 'string') { if (test(obj)) acc.push(obj); return acc; }
+  if (Array.isArray(obj)) { obj.forEach((v) => deepCollect(v, test, acc)); return acc; }
+  if (typeof obj === 'object') { Object.keys(obj).forEach((k) => deepCollect(obj[k], test, acc)); return acc; }
+  return acc;
+}
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function findEmails(p) { return [...new Set(deepCollect(p, (s) => EMAIL_RE.test(s)).map((e) => e.toLowerCase()))]; }
+function findConvIds(p) { return [...new Set(deepCollect(p, (s) => /^cnv_/.test(s)))]; }
+function findTagNames(obj, acc = []) {
+  if (Array.isArray(obj)) { obj.forEach((v) => findTagNames(v, acc)); }
+  else if (obj && typeof obj === 'object') {
+    if (typeof obj.id === 'string' && obj.id.startsWith('tag_') && typeof obj.name === 'string') acc.push(obj.name);
+    Object.keys(obj).forEach((k) => findTagNames(obj[k], acc));
+  }
+  return acc;
+}
+
+// Resolve our lead from a set of candidate emails (case-insensitive). Channel /
+// teammate emails simply won't match a lead, so this is safe.
+async function leadByEmails(emails) {
+  if (!emails || !emails.length) return null;
+  const orFilter = emails.map((e) => `email.ilike.${e}`).join(',');
+  const { data } = await supabase.from('leads').select('*').or(orFilter).limit(1);
+  return (data && data[0]) || null;
+}
+async function leadByConv(cId) {
+  if (!cId) return null;
+  const { data } = await supabase.from('leads').select('*').eq('front_conversation_id', cId).limit(1);
+  return (data && data[0]) || null;
+}
+
+// Most-advanced status tag wins if several are present during a transition.
+const TAG_PRIORITY = ['do not contact', 'inactive', 'current customer', 'dialogue', 'cold'];
+
+// Resolve our lead for an event: match any email in the payload, falling back to
+// the conversation's recipient (via Front API) and then to a stored conv id.
+async function resolveLead(payload, cId) {
+  let emails = findEmails(payload);
+  if (cId && process.env.FRONT_API_TOKEN) {
+    try {
+      const conv = await front.getConversation(cId);
+      const recip = conv && conv.recipient && conv.recipient.handle;
+      if (recip && EMAIL_RE.test(recip)) emails.push(recip.toLowerCase());
+    } catch (e) { /* ignore */ }
+  }
+  emails = [...new Set(emails)];
+  const lead = (await leadByEmails(emails)) || (await leadByConv(cId));
+  return { lead, emails };
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'POST only' });
 
   const rawBody = event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString('utf8') : (event.body || '');
   const sig = event.headers['x-front-signature'] || event.headers['X-Front-Signature'];
-  if (!verify(rawBody, sig)) return json(401, { error: 'bad signature' });
+  console.log('front-webhook received: sig?', !!sig, 'len', rawBody.length);
+  if (!verify(rawBody, sig)) { console.log('front-webhook REJECTED: bad signature'); return json(401, { error: 'bad signature' }); }
 
   let payload;
   try { payload = JSON.parse(rawBody); } catch { return json(400, { error: 'bad json' }); }
 
   const type = getType(payload);
   const convId = getConversationId(payload);
+  console.log('front-webhook event type:', type || '(none)', 'conv:', convId || '(none)');
 
   try {
-    // ---- Tag added → status sync ----
-    if (type === 'tag' || type === 'tagged' || type.includes('tag')) {
-      const tagName = (getTagName(payload) || '').trim();
-      const email = getContactEmail(payload);
-      const lead = await leadByEmail(email);
-      if (lead && tagName) {
-        const lower = tagName.toLowerCase();
-        if (STATUS_BY_TAG[lower]) {
-          await supabase.from('leads').update({ status: STATUS_BY_TAG[lower] }).eq('id', lead.id);
-          if (STATUS_BY_TAG[lower] !== 'cold') await cancelPendingSends(lead.id);
-          // Keep the four status tags mutually exclusive in Front.
-          if (convId) for (const t of EXCLUSIVE_TAGS) if (t.toLowerCase() !== lower) front.removeTag(convId, t).catch(() => {});
-        } else if (lower === 'pause') {
-          await supabase.from('leads').update({ paused: true }).eq('id', lead.id);
-        } else if (lower === 'do not contact') {
-          await supabase.from('leads').update({ status: 'inactive', paused: true }).eq('id', lead.id);
+    // ---- Tag added/removed → status sync ----
+    if (type.includes('tag')) {
+      const cId = convId || findConvIds(payload)[0] || null;
+      let emails = findEmails(payload);
+      let tagNames = findTagNames(payload);
+
+      // Authoritative lookup via the Front API: works even when "Send Full Event
+      // Data" is off, and returns the conversation's real current tags + recipient.
+      if (cId && process.env.FRONT_API_TOKEN) {
+        try {
+          const conv = await front.getConversation(cId);
+          const recip = conv && conv.recipient && conv.recipient.handle;
+          if (recip && EMAIL_RE.test(recip)) emails.push(recip.toLowerCase());
+          const ctags = (conv && conv.tags ? conv.tags : []).map((t) => t.name).filter(Boolean);
+          if (ctags.length) tagNames = ctags;
+        } catch (e) { console.log('front-webhook getConversation failed:', e.message); }
+      }
+      emails = [...new Set(emails)];
+
+      const lead = (await leadByEmails(emails)) || (await leadByConv(cId));
+      const present = tagNames.map((t) => t.toLowerCase());
+      console.log('front-webhook tag:', JSON.stringify({ cId, emails, tagNames, matched: lead ? lead.email : null }));
+
+      if (lead) {
+        if (present.includes('pause')) await supabase.from('leads').update({ paused: true }).eq('id', lead.id);
+        let chosen = null;
+        for (const t of TAG_PRIORITY) if (present.includes(t)) { chosen = t; break; }
+        if (chosen === 'do not contact') {
+          await supabase.from('leads').update({ status: 'inactive', paused: true, front_conversation_id: cId || lead.front_conversation_id }).eq('id', lead.id);
           await cancelPendingSends(lead.id);
           await supabase.from('suppression_list').upsert({ email: lead.email, reason: 'Do Not Contact (Front tag)' }, { onConflict: 'email' });
+        } else if (chosen && STATUS_BY_TAG[chosen]) {
+          await supabase.from('leads').update({ status: STATUS_BY_TAG[chosen], front_conversation_id: cId || lead.front_conversation_id }).eq('id', lead.id);
+          if (STATUS_BY_TAG[chosen] !== 'cold') await cancelPendingSends(lead.id);
         }
       }
-      return json(200, { ok: true, handled: 'tag' });
+      return json(200, { ok: true, handled: 'tag', matched: !!lead });
     }
 
     // ---- Comment → free-form Claude command ----
     if (type === 'comment') {
+      const cId = convId || findConvIds(payload)[0] || null;
       const text = getText(payload);
-      const email = getContactEmail(payload);
-      const lead = await leadByEmail(email);
+      const { lead, emails } = await resolveLead(payload, cId);
+      console.log('front-webhook comment:', JSON.stringify({ cId, emails, matched: lead ? lead.email : null, hasText: !!text }));
       if (lead && text) {
         const { data: campaign } = await supabase.from('campaigns').select('*').eq('id', lead.campaign_id).maybeSingle();
         let cmd;
@@ -125,13 +198,14 @@ exports.handler = async (event) => {
         catch { cmd = { action: 'none' }; }
         await applyCommand(cmd, lead);
       }
-      return json(200, { ok: true, handled: 'comment' });
+      return json(200, { ok: true, handled: 'comment', matched: !!lead });
     }
 
     // ---- Inbound message → reply-aware ----
     if (type === 'inbound' || type === 'inbound_message' || type === 'message') {
-      const email = getContactEmail(payload);
-      const lead = await leadByEmail(email);
+      const cId = convId || findConvIds(payload)[0] || null;
+      const { lead, emails } = await resolveLead(payload, cId);
+      console.log('front-webhook inbound:', JSON.stringify({ cId, emails, matched: lead ? lead.email : null }));
       if (lead) {
         const subject = getSubject(payload);
         const body = getText(payload);
@@ -139,7 +213,7 @@ exports.handler = async (event) => {
           return json(200, { ok: true, handled: 'inbound:auto-reply ignored' });
         }
         // Genuine human reply: Cold → Dialogue, draft a response for review.
-        const patch = { front_conversation_id: convId || lead.front_conversation_id };
+        const patch = { front_conversation_id: cId || lead.front_conversation_id };
         if (lead.status === 'cold') { patch.status = 'dialogue'; }
         await supabase.from('leads').update(patch).eq('id', lead.id);
         if (lead.status === 'cold') await cancelPendingSends(lead.id);
@@ -166,15 +240,15 @@ exports.handler = async (event) => {
 
     // ---- Bounce / delivery failure ----
     if (type.includes('bounce') || type.includes('sending_error') || type.includes('delivery')) {
-      const email = getContactEmail(payload);
-      const lead = await leadByEmail(email);
+      const cId = convId || findConvIds(payload)[0] || null;
+      const { lead } = await resolveLead(payload, cId);
       if (lead) {
         await supabase.from('leads').update({ status: 'inactive' }).eq('id', lead.id);
         await cancelPendingSends(lead.id);
         await supabase.from('suppression_list').upsert({ email: lead.email, reason: 'bounced' }, { onConflict: 'email' });
-        if (convId) front.applyTag(convId, 'Bounced').catch(() => {});
+        if (cId) front.applyTag(cId, 'Bounced').catch(() => {});
       }
-      return json(200, { ok: true, handled: 'bounce' });
+      return json(200, { ok: true, handled: 'bounce', matched: !!lead });
     }
 
     // Unknown event — log a trimmed sample so the payload shape can be tuned.

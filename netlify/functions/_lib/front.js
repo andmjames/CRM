@@ -138,6 +138,9 @@ async function removeTag(conversationId, tagName) {
 }
 
 // --- Conversation context ---
+async function getConversation(conversationId) {
+  return frontFetch(`/conversations/${conversationId}`);
+}
 async function getMessages(conversationId) {
   const json = await frontFetch(`/conversations/${conversationId}/messages`);
   return json._results || [];
@@ -161,6 +164,7 @@ module.exports = {
   listTags,
   applyTag,
   removeTag,
+  getConversation,
   getMessages,
   getThreadText,
 };

@@ -102,12 +102,20 @@ function UpcomingRow({ action, onChanged, onOpenLead, notify }) {
         <>
           {action.subject && <div style={{ fontWeight: 500, marginBottom: 3 }}>{action.subject}</div>}
           <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, marginBottom: 8 }}>
-            {action.generated_body || <em className="muted-sm">Generates after the previous email sends.</em>}
+            {action.generated_body || (
+              <em className="muted-sm">
+                {action.action_type === 'draft'
+                  ? 'Written from the live conversation when this date arrives.'
+                  : action.action_type === 'comment'
+                    ? 'Reminder comment posts on this date.'
+                    : 'Generated when its scheduled time arrives.'}
+              </em>
+            )}
           </div>
           <div className="row">
             <button className="btn ghost sm" onClick={() => setEdit(true)}>Edit</button>
             <div className="spacer" />
-            <button className="btn ghost sm danger" onClick={cancel}>Cancel send</button>
+            <button className="btn ghost sm danger" onClick={cancel}>Cancel</button>
           </div>
         </>
       ) : (

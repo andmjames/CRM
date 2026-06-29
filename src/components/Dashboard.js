@@ -126,7 +126,7 @@ export default function Dashboard({ data, onOpenLead, onViewUpcoming, onSelectCa
                   {who}
                 </div>
                 <div className="lead-email" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {a.subject || a.generated_body || 'Generates after the previous email sends'}
+                  {a.subject || a.generated_body || (a.action_type === 'draft' ? 'Written from the conversation on this date' : a.action_type === 'comment' ? 'Reminder posts on this date' : 'Generated when scheduled')}
                   {a.campaign?.name ? ` · ${a.campaign.name}` : ''}
                 </div>
               </div>

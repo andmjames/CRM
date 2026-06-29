@@ -170,7 +170,7 @@ function UpcomingItem({ action, onSaved, notify }) {
       {!edit ? (
         <>
           {action.subject && <div className="muted-sm" style={{ marginBottom: 4 }}>{action.subject}</div>}
-          <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, marginBottom: 8 }}>{action.generated_body || <em className="muted-sm">Generates after the previous email sends.</em>}</div>
+          <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, marginBottom: 8 }}>{action.generated_body || <em className="muted-sm">{action.action_type === 'draft' ? 'Written from the live conversation when this date arrives.' : action.action_type === 'comment' ? 'Reminder comment posts on this date.' : 'Generated when its scheduled time arrives.'}</em>}</div>
           <div className="row">
             <button className="btn ghost sm" onClick={() => setEdit(true)}>Edit</button>
             <label className="row" style={{ gap: 6, margin: 0 }}>

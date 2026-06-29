@@ -3,7 +3,7 @@
 // and chains the next cold email.
 const { supabase } = require('./_lib/supabase');
 const { nowLocal } = require('./_lib/schedule');
-const { enqueueNextColdEmail } = require('./_lib/core');
+const { enqueueNextColdEmail, enqueueNextDialogueDraft } = require('./_lib/core');
 const { generateReply } = require('./_lib/claude');
 const front = require('./_lib/front');
 
@@ -27,8 +27,22 @@ async function perform(action) {
   if (!lead || !campaign) throw new Error('lead or campaign missing');
 
   // Respect status/pause changes that happened after queuing.
-  if (lead.paused) throw new Error('lead paused');
-  if (action.action_type === 'send' && lead.status !== 'cold') throw new Error('lead no longer cold');
+  if (action.action_type === 'send') {
+    if (lead.paused) throw new Error('lead paused');
+    if (lead.status !== 'cold') throw new Error('lead no longer cold');
+  }
+  if (action.action_type === 'comment') {
+    if (lead.paused) throw new Error('lead paused');
+  }
+  if (action.action_type === 'draft') {
+    // Dialogue draft cadence only applies while the lead is an active Dialogue lead.
+    if (lead.paused || lead.status !== 'dialogue') {
+      await supabase.from('scheduled_actions')
+        .update({ status: 'done', executed_at: new Date().toISOString() })
+        .eq('id', action.id);
+      return;
+    }
+  }
 
   let result;
   if (action.action_type === 'send') {
@@ -63,7 +77,7 @@ async function perform(action) {
           lead,
           threadText,
           firstNames: [lead.first_name].filter(Boolean),
-          styleGuide: campaign.style_guide,
+          styleGuide: campaign.dialogue_style_guide || campaign.style_guide,
           globalCorrections: map.global_style_corrections || '',
         });
         body = gen.body || '';
@@ -105,6 +119,12 @@ async function perform(action) {
   if (action.action_type === 'send') {
     await supabase.from('leads').update({ sequence_step: action.step }).eq('id', lead.id);
     await enqueueNextColdEmail({ lead: { ...lead, sequence_step: action.step }, campaign, justSentStep: action.step });
+  }
+
+  // Advance dialogue draft cadence (schedule the next nudge draft until the cap).
+  if (action.action_type === 'draft') {
+    await supabase.from('leads').update({ dialogue_step: action.step }).eq('id', lead.id);
+    await enqueueNextDialogueDraft({ lead, campaign, justDraftedStep: action.step });
   }
 }
 

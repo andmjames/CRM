@@ -205,6 +205,47 @@ async function enqueueNextColdEmail({ lead, campaign, justSentStep }) {
   });
 }
 
+// A reply arrived: reset the dialogue draft cadence and queue an immediate draft
+// (step 1, now). Cancels any pending dialogue drafts so we restart from the reply.
+async function enqueueImmediateDialogueDraft({ lead, campaign }) {
+  await supabase.from('scheduled_actions').update({ status: 'canceled' })
+    .eq('lead_id', lead.id).eq('action_type', 'draft').eq('status', 'pending');
+  await supabase.from('leads').update({ dialogue_step: 0 }).eq('id', lead.id);
+  await supabase.from('scheduled_actions').insert({
+    lead_id: lead.id,
+    campaign_id: campaign.id,
+    action_type: 'draft',
+    step: 1,
+    scheduled_for: new Date().toISOString(),
+    channel_address: campaign.front_channel_address,
+    generated_body: '', // engine generates from the live thread + dialogue style
+  });
+}
+
+// After dialogue draft N is created, schedule draft N+1 (until the dialogue cap).
+// Step 1 is the immediate reply draft; step 2+ are weeks-apart nudge drafts.
+async function enqueueNextDialogueDraft({ lead, campaign, justDraftedStep }) {
+  const cap = Number(campaign.dialogue_max_drafts || 1);
+  const nextStep = (justDraftedStep || 0) + 1;
+  if (nextStep > cap) return;
+  const weeksArr = campaign.dialogue_followup_weeks || [];
+  const weeks = weeksArr[nextStep - 2]; // step 2 -> index 0
+  if (weeks == null) return;
+  const settings = await getSettings();
+  const start = Number(settings.send_window_start_hour || 8);
+  const end = Number(settings.send_window_end_hour || 16);
+  const scheduledFor = rollForward(nowLocal().plus({ weeks: Number(weeks) }), start, end, businessDaysOnly(settings));
+  await supabase.from('scheduled_actions').insert({
+    lead_id: lead.id,
+    campaign_id: campaign.id,
+    action_type: 'draft',
+    step: nextStep,
+    scheduled_for: scheduledFor.toUTC().toISO(),
+    channel_address: campaign.front_channel_address,
+    generated_body: '',
+  });
+}
+
 // Wrap a handler so any thrown error becomes a readable JSON 500 instead of a 502.
 function safe(handler) {
   return async (event, context) => {
@@ -224,4 +265,6 @@ module.exports = {
   nextStaggeredSlot,
   enqueueColdEmail1,
   enqueueNextColdEmail,
+  enqueueImmediateDialogueDraft,
+  enqueueNextDialogueDraft,
 };

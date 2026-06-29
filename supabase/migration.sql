@@ -20,6 +20,9 @@ create table if not exists campaigns (
   followup_weeks    int[] not null default '{}', -- weeks AFTER the previous email
   max_emails        int not null default 12,
   samples_enabled   boolean not null default false,
+  dialogue_style_guide   text default 'Reply helpfully and personally to what the contact wrote. Answer their questions directly, keep it warm and concise, move the conversation forward, and sign off "Thank you very much,".',
+  dialogue_followup_weeks int[] not null default '{2,4,8}', -- nudge-draft cadence
+  dialogue_max_drafts    int not null default 4,    -- hard cap on dialogue drafts
   active            boolean not null default true,
   created_at        timestamptz not null default now()
 );
@@ -45,6 +48,7 @@ create table if not exists leads (
   notes             text default '',
   samples           text[] not null default '{}', -- PMI only
   sequence_step     int not null default 0,       -- count of cold emails already sent
+  dialogue_step     int not null default 0,       -- count of dialogue drafts created
   interval_overrides jsonb,                        -- per-lead interval edits
   front_conversation_id text,
   paused            boolean not null default false,

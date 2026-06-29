@@ -5,6 +5,8 @@ const BLANK = {
   name: '', brand: '', front_channel_address: '', audience_type: 'retailers',
   product_info: '', style_guide: '', first_email_mode: 'immediate', first_email_weeks: 0,
   followup_weeks: '4,6,8,12,16,20,24,28,32,36,40', max_emails: 12, samples_enabled: false,
+  dialogue_style_guide: 'Reply helpfully and personally to what the contact wrote. Answer their questions directly, keep it warm and concise, move the conversation forward, and sign off "Thank you very much,".',
+  dialogue_followup_weeks: '2,4,8', dialogue_max_drafts: 4,
   subject: '', body: 'GREETING FIRST_NAME,',
 };
 
@@ -26,6 +28,7 @@ export default function ManageCampaigns({ notify, onChanged }) {
     setForm({
       ...c,
       followup_weeks: (c.followup_weeks || []).join(','),
+      dialogue_followup_weeks: (c.dialogue_followup_weeks || []).join(','),
       subject: tpl.subject || '', body: tpl.body || 'GREETING FIRST_NAME,',
     });
     setEditing(c.id);
@@ -41,6 +44,8 @@ export default function ManageCampaigns({ notify, onChanged }) {
         max_emails: Number(form.max_emails) || 12,
         followup_weeks: String(form.followup_weeks).split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n)),
         samples_enabled: !!form.samples_enabled,
+        dialogue_max_drafts: Number(form.dialogue_max_drafts) || 1,
+        dialogue_followup_weeks: String(form.dialogue_followup_weeks).split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n)),
       };
       if (editing === 'new') await api.createCampaign(payload);
       else await api.updateCampaign({ id: editing, ...payload });
@@ -98,6 +103,13 @@ export default function ManageCampaigns({ notify, onChanged }) {
               <span>Track sample selection (PMI-style)</span>
             </label>
           </div>
+
+          <div className="divider" />
+          <p className="section-title">Dialogue draft responses (when a lead replies)</p>
+          <p className="sub" style={{ margin: '0 0 10px' }}>When a lead replies to a cold email, Claude drafts a response (for your review) and keeps drafting nudge responses on the schedule below until the cap.</p>
+          <label className="field"><span>Immediate Draft Response style guide (tone for AI-drafted replies)</span><textarea value={form.dialogue_style_guide} onChange={set('dialogue_style_guide')} /></label>
+          <label className="field"><span>Weeks after each previous email (comma-separated)</span><input value={form.dialogue_followup_weeks} onChange={set('dialogue_followup_weeks')} placeholder="2,4,8" /></label>
+          <label className="field" style={{ width: 180 }}><span>Hard cap (total drafts)</span><input type="number" value={form.dialogue_max_drafts} onChange={set('dialogue_max_drafts')} /></label>
 
           <div className="row" style={{ marginTop: 16 }}>
             <button className="btn" disabled={busy} onClick={save}>Save campaign</button>

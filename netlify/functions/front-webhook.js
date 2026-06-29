@@ -4,7 +4,7 @@
 // is handed to the engine so this always acks within Front's 5s window.
 const crypto = require('crypto');
 const { supabase } = require('./_lib/supabase');
-const { json } = require('./_lib/core');
+const { json, enqueueImmediateDialogueDraft } = require('./_lib/core');
 const { generateCommandFromComment } = require('./_lib/claude');
 const front = require('./_lib/front');
 
@@ -207,9 +207,15 @@ exports.handler = async (event) => {
       const { lead, emails } = await resolveLead(payload, cId);
       console.log('front-webhook inbound:', JSON.stringify({ cId, emails, matched: lead ? lead.email : null }));
       if (lead) {
-        const subject = getSubject(payload);
-        const body = getText(payload);
+        let subject = getSubject(payload);
+        let body = getText(payload);
+        // If the payload didn't include the message text (Full Event Data off),
+        // pull it from Front so out-of-office / bounce detection still works.
+        if (!subject && !body && cId && process.env.FRONT_API_TOKEN) {
+          try { body = await front.getThreadText(cId, 1); } catch { /* ignore */ }
+        }
         if (looksAutomated(subject, body)) {
+          console.log('front-webhook inbound: auto-reply/bounce ignored');
           return json(200, { ok: true, handled: 'inbound:auto-reply ignored' });
         }
         // Genuine human reply: Cold → Dialogue, draft a response for review.
@@ -221,17 +227,9 @@ exports.handler = async (event) => {
           front.syncStatusTag(cId || lead.front_conversation_id, patch.status).catch(() => {});
         }
 
-        // Queue a draft for the engine to generate with thread context.
-        const { data: campaign } = await supabase.from('campaigns').select('front_channel_address').eq('id', lead.campaign_id).maybeSingle();
-        await supabase.from('scheduled_actions').insert({
-          lead_id: lead.id,
-          campaign_id: lead.campaign_id,
-          action_type: 'draft',
-          step: 0,
-          scheduled_for: new Date().toISOString(),
-          channel_address: campaign?.front_channel_address || null,
-          generated_body: '', // engine fills this in
-        });
+        // Immediate draft reply + (re)start the dialogue draft cadence.
+        const { data: campaign } = await supabase.from('campaigns').select('id, front_channel_address').eq('id', lead.campaign_id).maybeSingle();
+        if (campaign) await enqueueImmediateDialogueDraft({ lead: { ...lead, ...patch }, campaign });
         // Fire-and-forget engine kick so the draft appears promptly.
         try {
           const base = process.env.URL || `https://${event.headers.host}`;

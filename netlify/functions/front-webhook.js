@@ -243,7 +243,7 @@ exports.handler = async (event) => {
         await supabase.from('leads').update(patch).eq('id', lead.id);
         if (lead.status === 'cold') await cancelPendingSends(lead.id);
         if ((cId || lead.front_conversation_id) && patch.status) {
-          front.syncStatusTag(cId || lead.front_conversation_id, patch.status).catch(() => {});
+          try { await front.syncStatusTag(cId || lead.front_conversation_id, patch.status); } catch { /* ignore */ }
         }
 
         // Auto-draft only for Dialogue leads. Current Customers and inactive
@@ -252,11 +252,17 @@ exports.handler = async (event) => {
         if (effectiveStatus === 'dialogue') {
           const { data: campaign } = await supabase.from('campaigns').select('id, front_channel_address, immediate_draft_response, dialogue_followup_weeks, dialogue_max_drafts').eq('id', lead.campaign_id).maybeSingle();
           if (campaign) await startDialogueDrafts({ lead: { ...lead, ...patch }, campaign });
-          // Fire-and-forget engine kick so the draft appears promptly.
+          // Kick the engine so the immediate draft is created now. Await it (a
+          // fire-and-forget call is killed when Netlify freezes the function),
+          // but cap the wait so a backlog can't time out the Front webhook — the
+          // engine invocation keeps running on its own and cron is the backstop.
           try {
             const base = process.env.URL || `https://${event.headers.host}`;
-            fetch(`${base}/.netlify/functions/engine`).catch(() => {});
-          } catch { /* ignore */ }
+            await Promise.race([
+              fetch(`${base}/.netlify/functions/engine`),
+              new Promise((r) => setTimeout(r, 8000)),
+            ]);
+          } catch { /* cron will pick it up within 5 min */ }
         }
       }
       return json(200, { ok: true, handled: 'inbound' });
@@ -270,7 +276,7 @@ exports.handler = async (event) => {
         await supabase.from('leads').update({ status: 'inactive' }).eq('id', lead.id);
         await cancelPendingSends(lead.id);
         await supabase.from('suppression_list').upsert({ email: lead.email, reason: 'bounced' }, { onConflict: 'email' });
-        if (cId) { front.applyTag(cId, 'Bounced').catch(() => {}); front.syncStatusTag(cId, 'inactive').catch(() => {}); }
+        if (cId) { try { await front.applyTag(cId, 'Bounced'); } catch { /* ignore */ } try { await front.syncStatusTag(cId, 'inactive'); } catch { /* ignore */ } }
       }
       return json(200, { ok: true, handled: 'bounce', matched: !!lead });
     }
@@ -297,14 +303,14 @@ async function applyCommand(cmd, lead, cId) {
       if (['cold', 'dialogue', 'current_customer', 'inactive'].includes(cmd.status)) {
         await supabase.from('leads').update({ status: cmd.status }).eq('id', lead.id);
         if (cmd.status !== 'cold') await cancelPendingSends(lead.id);
-        if (cId) front.syncStatusTag(cId, cmd.status).catch(() => {});
+        if (cId) { try { await front.syncStatusTag(cId, cmd.status); } catch { /* ignore */ } }
       }
       break;
     case 'stop':
       await supabase.from('leads').update({ status: 'inactive', paused: true }).eq('id', lead.id);
       await cancelPendingSends(lead.id);
       await supabase.from('suppression_list').upsert({ email: lead.email, reason: 'comment command: stop' }, { onConflict: 'email' });
-      if (cId) front.syncStatusTag(cId, 'inactive').catch(() => {});
+      if (cId) { try { await front.syncStatusTag(cId, 'inactive'); } catch { /* ignore */ } }
       break;
     case 'remind': {
       const days = Number(cmd.days) > 0 ? Number(cmd.days) : 14;

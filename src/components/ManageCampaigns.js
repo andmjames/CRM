@@ -112,10 +112,11 @@ export default function ManageCampaigns({ notify, onChanged }) {
           <h2 style={{ margin: '4px 0 2px' }}>Dialogue Emails</h2>
           <p className="sub" style={{ margin: '0 0 12px' }}>Draft responses (for your review) once a lead replies and becomes a Dialogue lead.</p>
 
-          <label className="row" style={{ gap: 8, marginBottom: 14, alignItems: 'flex-start' }}>
-            <input type="checkbox" style={{ width: 'auto', marginTop: 3 }} checked={form.immediate_draft_response !== false} onChange={set('immediate_draft_response')} />
-            <span>Immediate Draft Response — draft a reply the moment a lead responds. Scheduled draft responses below run either way; turn this off to only get the scheduled ones.</span>
+          <label className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <input type="checkbox" style={{ width: 'auto' }} checked={form.immediate_draft_response !== false} onChange={set('immediate_draft_response')} />
+            <span style={{ fontWeight: 600 }}>Immediate Draft Response</span>
           </label>
+          <p className="sub" style={{ margin: '6px 0 14px 26px' }}>Draft a reply the moment a lead responds. The scheduled draft responses below run either way — turn this off to only get the scheduled ones.</p>
 
           <label className="field"><span>Style guide (tone for AI-drafted replies)</span><textarea value={form.dialogue_style_guide} onChange={set('dialogue_style_guide')} /></label>
 

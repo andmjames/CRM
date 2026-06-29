@@ -59,7 +59,7 @@ async function perform(action) {
       if (cid) {
         lead.front_conversation_id = cid;
         await supabase.from('leads').update({ front_conversation_id: cid }).eq('id', lead.id);
-        front.syncStatusTag(cid, 'cold').catch(() => {});
+        try { await front.syncStatusTag(cid, 'cold'); } catch { /* ignore */ }
       }
     }
   } else if (action.action_type === 'draft') {
@@ -85,7 +85,7 @@ async function perform(action) {
       await supabase.from('scheduled_actions').update({ generated_body: body }).eq('id', action.id);
     }
     if (lead.front_conversation_id) {
-      result = await front.createDraftReply({ conversationId: lead.front_conversation_id, body });
+      result = await front.createDraftReply({ conversationId: lead.front_conversation_id, channelAddress: action.channel_address, body });
     } else {
       result = await front.createDraft({
         channelAddress: action.channel_address,

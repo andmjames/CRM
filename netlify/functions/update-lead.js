@@ -38,9 +38,10 @@ const _handler = async (event) => {
       .eq('lead_id', id).in('status', ['pending']);
   }
 
-  // Mirror a status change onto the Front conversation tags (best-effort).
+  // Mirror a status change onto the Front conversation tags (awaited so it
+  // completes before the function freezes).
   if (status && lead?.front_conversation_id) {
-    require('./_lib/front').syncStatusTag(lead.front_conversation_id, status).catch(() => {});
+    try { await require('./_lib/front').syncStatusTag(lead.front_conversation_id, status); } catch { /* ignore */ }
   }
 
   return json(200, { lead });

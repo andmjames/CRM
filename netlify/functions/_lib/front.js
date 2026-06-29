@@ -80,13 +80,37 @@ async function createDraft({ channelAddress, to, subject, body }) {
   });
 }
 
+// Channels list, cached per cold start. Used to resolve a channel_id from an address.
+let _channelsCache = null;
+async function listChannels() {
+  if (_channelsCache) return _channelsCache;
+  const json = await frontFetch('/channels');
+  _channelsCache = json._results || [];
+  return _channelsCache;
+}
+async function channelIdByAddress(address) {
+  if (!address) return null;
+  const lc = String(address).toLowerCase();
+  const channels = await listChannels();
+  const hit = channels.find((c) => String(c.address || '').toLowerCase() === lc
+    || String(c.send_as || '').toLowerCase() === lc);
+  if (!hit) {
+    console.warn('front channelIdByAddress: no match for', address,
+      '— available:', channels.map((c) => `${c.id}:${c.address || c.send_as || ''}`).join(', '));
+  }
+  return hit ? hit.id : null;
+}
+
 // Create a draft REPLY on an existing conversation (Dialogue leads). Not auto-sent.
+// Front requires a channel_id to know which channel the reply sends from.
 async function createDraftReply({ conversationId, channelAddress, body, to }) {
+  let channel_id = null;
+  if (channelAddress) { try { channel_id = await channelIdByAddress(channelAddress); } catch { /* ignore */ } }
   return frontFetch(`/conversations/${conversationId}/drafts`, {
     method: 'POST',
     body: JSON.stringify({
-      channel_id: channelAddress ? undefined : undefined, // resolved by Front from convo
-      to: to && (Array.isArray(to) ? to : [to]),
+      ...(channel_id ? { channel_id } : {}),
+      ...(to ? { to: Array.isArray(to) ? to : [to] } : {}),
       body: withSignatureGap(body),
       author_id: process.env.FRONT_AUTHOR_ID,
       ...signatureFields(),

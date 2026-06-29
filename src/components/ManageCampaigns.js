@@ -6,7 +6,7 @@ const BLANK = {
   product_info: '', style_guide: '', first_email_mode: 'immediate', first_email_weeks: 0,
   followup_weeks: '4,6,8,12,16,20,24,28,32,36,40', max_emails: 12, samples_enabled: false,
   dialogue_style_guide: 'Reply helpfully and personally to what the contact wrote. Answer their questions directly, keep it warm and concise, move the conversation forward, and sign off "Thank you very much,".',
-  dialogue_followup_weeks: '2,4,8', dialogue_max_drafts: 4,
+  dialogue_followup_weeks: '2,4,8', dialogue_max_drafts: 4, immediate_draft_response: true,
   subject: '', body: 'GREETING FIRST_NAME,',
 };
 
@@ -46,6 +46,7 @@ export default function ManageCampaigns({ notify, onChanged }) {
         samples_enabled: !!form.samples_enabled,
         dialogue_max_drafts: Number(form.dialogue_max_drafts) || 1,
         dialogue_followup_weeks: String(form.dialogue_followup_weeks).split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n)),
+        immediate_draft_response: form.immediate_draft_response !== false,
       };
       if (editing === 'new') await api.createCampaign(payload);
       else await api.updateCampaign({ id: editing, ...payload });
@@ -74,10 +75,14 @@ export default function ManageCampaigns({ notify, onChanged }) {
             <label className="field" style={{ flex: 2 }}><span>Sender (Front channel address)</span><input value={form.front_channel_address} onChange={set('front_channel_address')} placeholder="andrew@floorbondtape.com" /></label>
           </div>
 
-          <label className="field"><span>Product info (used by AI for follow-ups)</span><textarea value={form.product_info} onChange={set('product_info')} /></label>
-          <label className="field"><span>Style guide (tone for AI follow-ups)</span><textarea value={form.style_guide} onChange={set('style_guide')} /></label>
+          <label className="field"><span>Product info (shared AI context for all emails)</span><textarea value={form.product_info} onChange={set('product_info')} /></label>
 
           <div className="divider" />
+          <h2 style={{ margin: '4px 0 2px' }}>Cold Emails</h2>
+          <p className="sub" style={{ margin: '0 0 12px' }}>The outbound sequence sent automatically to new leads.</p>
+
+          <label className="field"><span>Style guide (tone for AI cold follow-ups)</span><textarea value={form.style_guide} onChange={set('style_guide')} /></label>
+
           <p className="section-title">First email</p>
           <div className="row" style={{ gap: 12 }}>
             <label className="field" style={{ flex: 1 }}><span>When to send</span>
@@ -93,7 +98,6 @@ export default function ManageCampaigns({ notify, onChanged }) {
           <label className="field"><span>Email 1 subject</span><input value={form.subject} onChange={set('subject')} /></label>
           <label className="field"><span>Email 1 body — placeholders: GREETING (Good morning/afternoon by send time), FIRST_NAME, SAMPLES</span><textarea value={form.body} onChange={set('body')} style={{ minHeight: 140 }} /></label>
 
-          <div className="divider" />
           <p className="section-title">Follow-ups (AI-generated)</p>
           <label className="field"><span>Weeks after each previous email (comma-separated)</span><input value={form.followup_weeks} onChange={set('followup_weeks')} placeholder="4,6,8,12,16,20,24,28,32,36,40" /></label>
           <div className="row" style={{ gap: 12 }}>
@@ -105,9 +109,17 @@ export default function ManageCampaigns({ notify, onChanged }) {
           </div>
 
           <div className="divider" />
-          <p className="section-title">Dialogue draft responses (when a lead replies)</p>
-          <p className="sub" style={{ margin: '0 0 10px' }}>When a lead replies to a cold email, Claude drafts a response (for your review) and keeps drafting nudge responses on the schedule below until the cap.</p>
-          <label className="field"><span>Immediate Draft Response style guide (tone for AI-drafted replies)</span><textarea value={form.dialogue_style_guide} onChange={set('dialogue_style_guide')} /></label>
+          <h2 style={{ margin: '4px 0 2px' }}>Dialogue Emails</h2>
+          <p className="sub" style={{ margin: '0 0 12px' }}>Draft responses (for your review) once a lead replies and becomes a Dialogue lead.</p>
+
+          <label className="row" style={{ gap: 8, marginBottom: 14, alignItems: 'flex-start' }}>
+            <input type="checkbox" style={{ width: 'auto', marginTop: 3 }} checked={form.immediate_draft_response !== false} onChange={set('immediate_draft_response')} />
+            <span>Immediate Draft Response — draft a reply the moment a lead responds. Scheduled draft responses below run either way; turn this off to only get the scheduled ones.</span>
+          </label>
+
+          <label className="field"><span>Style guide (tone for AI-drafted replies)</span><textarea value={form.dialogue_style_guide} onChange={set('dialogue_style_guide')} /></label>
+
+          <p className="section-title">Scheduled draft responses</p>
           <label className="field"><span>Weeks after each previous email (comma-separated)</span><input value={form.dialogue_followup_weeks} onChange={set('dialogue_followup_weeks')} placeholder="2,4,8" /></label>
           <label className="field" style={{ width: 180 }}><span>Hard cap (total drafts)</span><input type="number" value={form.dialogue_max_drafts} onChange={set('dialogue_max_drafts')} /></label>
 

@@ -163,6 +163,10 @@ async function getMessages(conversationId) {
   const json = await frontFetch(`/conversations/${conversationId}/messages`);
   return json._results || [];
 }
+async function getComments(conversationId) {
+  const json = await frontFetch(`/conversations/${conversationId}/comments`);
+  return json._results || [];
+}
 // Best-effort: pull readable text from the most recent inbound messages.
 async function getThreadText(conversationId, limit = 3) {
   const msgs = await getMessages(conversationId);
@@ -186,5 +190,6 @@ module.exports = {
   extractConversationId,
   getConversation,
   getMessages,
+  getComments,
   getThreadText,
 };

@@ -23,6 +23,7 @@ create table if not exists campaigns (
   dialogue_style_guide   text default 'Reply helpfully and personally to what the contact wrote. Answer their questions directly, keep it warm and concise, move the conversation forward, and sign off "Thank you very much,".',
   dialogue_followup_weeks int[] not null default '{2,4,8}', -- nudge-draft cadence
   dialogue_max_drafts    int not null default 4,    -- hard cap on dialogue drafts
+  immediate_draft_response boolean not null default true, -- draft instantly on reply
   active            boolean not null default true,
   created_at        timestamptz not null default now()
 );

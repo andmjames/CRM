@@ -32,6 +32,7 @@ const _handler = async (event) => {
       dialogue_style_guide: p.dialogue_style_guide || '',
       dialogue_followup_weeks: p.dialogue_followup_weeks || [],
       dialogue_max_drafts: p.dialogue_max_drafts || 1,
+      immediate_draft_response: p.immediate_draft_response !== false,
     }).select('*').maybeSingle();
     if (error) return json(500, { error: error.message });
     await supabase.from('templates').insert({
@@ -46,7 +47,7 @@ const _handler = async (event) => {
     const fields = ['name', 'brand', 'front_channel_address', 'audience_type', 'product_info',
       'style_guide', 'first_email_mode', 'first_email_weeks', 'followup_weeks', 'max_emails',
       'samples_enabled', 'active',
-      'dialogue_style_guide', 'dialogue_followup_weeks', 'dialogue_max_drafts'];
+      'dialogue_style_guide', 'dialogue_followup_weeks', 'dialogue_max_drafts', 'immediate_draft_response'];
     const patch = {};
     fields.forEach((f) => { if (p[f] !== undefined) patch[f] = p[f]; });
     const { error } = await supabase.from('campaigns').update(patch).eq('id', p.id);

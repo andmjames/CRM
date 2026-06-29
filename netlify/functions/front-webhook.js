@@ -4,7 +4,7 @@
 // is handed to the engine so this always acks within Front's 5s window.
 const crypto = require('crypto');
 const { supabase } = require('./_lib/supabase');
-const { json, enqueueImmediateDialogueDraft } = require('./_lib/core');
+const { json, startDialogueDrafts } = require('./_lib/core');
 const { generateCommandFromComment } = require('./_lib/claude');
 const front = require('./_lib/front');
 
@@ -185,16 +185,35 @@ exports.handler = async (event) => {
       return json(200, { ok: true, handled: 'tag', matched: !!lead });
     }
 
-    // ---- Comment → free-form Claude command ----
+    // ---- Comment → @crm command ----
     if (type === 'comment') {
       const cId = convId || findConvIds(payload)[0] || null;
-      const text = getText(payload);
+      let text = getText(payload);
+      // Fetch the comment body from Front if the payload didn't include it.
+      if (!text && cId && process.env.FRONT_API_TOKEN) {
+        try {
+          const comments = await front.getComments(cId);
+          text = comments.length ? (comments[comments.length - 1].body || '') : '';
+        } catch { /* ignore */ }
+      }
+      // Only act on comments that explicitly mention @crm. This skips ordinary
+      // internal notes and keeps the reminder comments (which contain no @crm)
+      // from re-triggering this handler.
+      if (!text || !/@crm\b/i.test(text)) {
+        return json(200, { ok: true, handled: 'comment:no @crm' });
+      }
       const { lead, emails } = await resolveLead(payload, cId);
-      console.log('front-webhook comment:', JSON.stringify({ cId, emails, matched: lead ? lead.email : null, hasText: !!text }));
-      if (lead && text) {
+      console.log('front-webhook comment:', JSON.stringify({ cId, emails, matched: lead ? lead.email : null }));
+      if (lead) {
+        // Remember the conversation so scheduled reminders can post here later.
+        if (cId && lead.front_conversation_id !== cId) {
+          await supabase.from('leads').update({ front_conversation_id: cId }).eq('id', lead.id);
+          lead.front_conversation_id = cId;
+        }
+        const cleaned = text.replace(/@crm/ig, '').trim();
         const { data: campaign } = await supabase.from('campaigns').select('*').eq('id', lead.campaign_id).maybeSingle();
         let cmd;
-        try { cmd = await generateCommandFromComment({ commentText: text, lead, campaign }); }
+        try { cmd = await generateCommandFromComment({ commentText: cleaned, lead, campaign }); }
         catch { cmd = { action: 'none' }; }
         await applyCommand(cmd, lead, cId || lead.front_conversation_id);
       }
@@ -227,14 +246,18 @@ exports.handler = async (event) => {
           front.syncStatusTag(cId || lead.front_conversation_id, patch.status).catch(() => {});
         }
 
-        // Immediate draft reply + (re)start the dialogue draft cadence.
-        const { data: campaign } = await supabase.from('campaigns').select('id, front_channel_address').eq('id', lead.campaign_id).maybeSingle();
-        if (campaign) await enqueueImmediateDialogueDraft({ lead: { ...lead, ...patch }, campaign });
-        // Fire-and-forget engine kick so the draft appears promptly.
-        try {
-          const base = process.env.URL || `https://${event.headers.host}`;
-          fetch(`${base}/.netlify/functions/engine`).catch(() => {});
-        } catch { /* ignore */ }
+        // Auto-draft only for Dialogue leads. Current Customers and inactive
+        // leads never get automatic drafts — those are handled via @crm comments.
+        const effectiveStatus = patch.status || lead.status;
+        if (effectiveStatus === 'dialogue') {
+          const { data: campaign } = await supabase.from('campaigns').select('id, front_channel_address, immediate_draft_response, dialogue_followup_weeks, dialogue_max_drafts').eq('id', lead.campaign_id).maybeSingle();
+          if (campaign) await startDialogueDrafts({ lead: { ...lead, ...patch }, campaign });
+          // Fire-and-forget engine kick so the draft appears promptly.
+          try {
+            const base = process.env.URL || `https://${event.headers.host}`;
+            fetch(`${base}/.netlify/functions/engine`).catch(() => {});
+          } catch { /* ignore */ }
+        }
       }
       return json(200, { ok: true, handled: 'inbound' });
     }
@@ -283,6 +306,22 @@ async function applyCommand(cmd, lead, cId) {
       await supabase.from('suppression_list').upsert({ email: lead.email, reason: 'comment command: stop' }, { onConflict: 'email' });
       if (cId) front.syncStatusTag(cId, 'inactive').catch(() => {});
       break;
+    case 'remind': {
+      const days = Number(cmd.days) > 0 ? Number(cmd.days) : 14;
+      const when = new Date(Date.now() + days * 86400000).toISOString();
+      let body = (cmd.note && String(cmd.note).trim()) || 'This is your reminder to follow up.';
+      body = body.replace(/@crm/ig, '').trim(); // never echo the trigger (avoids re-firing)
+      await supabase.from('scheduled_actions').insert({
+        lead_id: lead.id,
+        campaign_id: lead.campaign_id,
+        action_type: 'comment',
+        step: 0,
+        scheduled_for: when,
+        channel_address: null,
+        generated_body: body,
+      });
+      break;
+    }
     case 'note': {
       const note = (lead.notes ? lead.notes + '\n' : '') + (cmd.note || '');
       await supabase.from('leads').update({ notes: note }).eq('id', lead.id);

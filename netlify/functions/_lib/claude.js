@@ -90,16 +90,17 @@ async function generateReply({ kind, campaign, lead, threadText, firstNames, sty
 // Returns { action, status?, days?, note? }.
 async function generateCommandFromComment({ commentText, lead, campaign }) {
   const system = [
-    'You convert a short internal instruction (a Front comment) about an outreach lead into ONE structured action.',
+    'You convert a short internal instruction (a Front comment, with the "@crm" mention removed) about an outreach lead into ONE structured action.',
     'Output ONLY valid JSON, no markdown: {"action":"...","status":"...","days":0,"note":"..."}.',
     'Valid "action" values:',
+    '- "remind": schedule a follow-up reminder. Put the delay in "days" (2 weeks = 14, 1 month = 30). Put a short reminder message in "note" (e.g. "This is your reminder to follow up." — fold in any specifics mentioned).',
     '- "pause": pause scheduled emails for N days (include "days").',
     '- "resume": unpause the lead.',
     '- "set_status": change status (include "status" = cold|dialogue|current_customer|inactive).',
     '- "stop": permanently stop contacting this lead (do not contact).',
     '- "note": just record the text as an internal note (include "note").',
     '- "none": no actionable instruction.',
-    'Include only the keys relevant to the action. If the comment is ambiguous or conversational, use "none".',
+    'Example: "follow up in 2 weeks on this" -> {"action":"remind","days":14,"note":"This is your reminder to follow up."}. Include only relevant keys. If ambiguous, use "none".',
   ].join('\n');
   const user = [
     `Lead: ${lead.first_name || ''} ${lead.last_name || ''} <${lead.email}>, current status ${lead.status}, campaign ${campaign?.name || ''}.`,

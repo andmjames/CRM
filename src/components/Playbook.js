@@ -12,6 +12,7 @@ export default function Playbook({ notify }) {
   const [rules, setRules] = useState([]);
   const [months, setMonths] = useState(24);
   const [busy, setBusy] = useState(false);
+  const [showApproved, setShowApproved] = useState(false);
 
   const loadStatus = useCallback(async () => {
     try { setStatus(await api.playbookStatus()); } catch (e) { notify(e.message); }
@@ -140,22 +141,32 @@ export default function Playbook({ notify }) {
         );
       })}
 
-      {/* Approved rules */}
+      {/* Approved rules (collapsible) */}
       {approved.length > 0 && (
-        <>
-          <h2 style={{ marginTop: 24 }}>Approved <span className="muted-sm">{approved.length}</span></h2>
-          <p className="sub" style={{ marginTop: 0 }}>These are applied to every Dialogue reply draft.</p>
-          {approved.map((r) => (
-            <div className="card" key={r.id} style={{ padding: '10px 12px', marginBottom: 8 }}>
-              <div style={{ fontSize: 14 }}><span className="muted-sm" style={{ textTransform: 'capitalize' }}>[{r.category.replace('_', ' ')}] </span>{r.rule_text}</div>
-              <div className="row" style={{ marginTop: 8 }}>
-                <div className="spacer" />
-                <button className="btn ghost sm" onClick={() => ruleAction({ action: 'set_status', id: r.id, status: 'suggested' })}>Unapprove</button>
-                <button className="btn ghost sm danger" onClick={() => ruleAction({ action: 'delete', id: r.id })}>Delete</button>
-              </div>
+        <div style={{ marginTop: 24 }}>
+          <button
+            className="btn ghost"
+            onClick={() => setShowApproved((v) => !v)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
+          >
+            <span>Approved rules <span className="muted-sm">({approved.length})</span> — applied to every Dialogue reply draft</span>
+            <span style={{ transform: showApproved ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>▾</span>
+          </button>
+          {showApproved && (
+            <div style={{ marginTop: 10 }}>
+              {approved.map((r) => (
+                <div className="card" key={r.id} style={{ padding: '10px 12px', marginBottom: 8 }}>
+                  <div style={{ fontSize: 14 }}><span className="muted-sm" style={{ textTransform: 'capitalize' }}>[{r.category.replace('_', ' ')}] </span>{r.rule_text}</div>
+                  <div className="row" style={{ marginTop: 8 }}>
+                    <div className="spacer" />
+                    <button className="btn ghost sm" onClick={() => ruleAction({ action: 'set_status', id: r.id, status: 'suggested' })}>Unapprove</button>
+                    <button className="btn ghost sm danger" onClick={() => ruleAction({ action: 'delete', id: r.id })}>Delete</button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </>
+          )}
+        </div>
       )}
     </>
   );

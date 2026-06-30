@@ -9,9 +9,11 @@ const _handler = async (event) => {
   let payload;
   try { payload = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'bad json' }); }
 
-  const { campaign_id, first_name, last_name, email, company, samples, source } = payload;
+  const { campaign_id, first_name, last_name, email, company, samples, source, status } = payload;
   if (!campaign_id || !email) return json(400, { error: 'campaign_id and email are required' });
   const cleanEmail = String(email).trim().toLowerCase();
+  const VALID_STATUS = ['cold', 'dialogue', 'current_customer', 'inactive'];
+  const leadStatus = VALID_STATUS.includes(status) ? status : 'cold';
 
   // Suppression + global-uniqueness checks.
   if (await isSuppressed(cleanEmail)) return json(409, { error: 'email is on the Do Not Contact list', code: 'suppressed' });
@@ -40,19 +42,21 @@ const _handler = async (event) => {
     first_name: first_name || '',
     last_name: last_name || '',
     email: cleanEmail,
-    status: 'cold',
+    status: leadStatus,
     samples: Array.isArray(samples) ? samples : [],
     source: source || 'manual',
   }).select('*').maybeSingle();
   if (lErr) return json(500, { error: lErr.message });
 
-  await enqueueColdEmail1(lead, campaign);
-
-  // Kick the engine so immediate first emails go out promptly (best-effort).
-  try {
-    const base = process.env.URL || `https://${event.headers.host}`;
-    fetch(`${base}/.netlify/functions/engine`).catch(() => {});
-  } catch { /* ignore */ }
+  // Only Cold leads enter the automated cold-email sequence.
+  if (leadStatus === 'cold') {
+    await enqueueColdEmail1(lead, campaign);
+    // Kick the engine so immediate first emails go out promptly (best-effort).
+    try {
+      const base = process.env.URL || `https://${event.headers.host}`;
+      fetch(`${base}/.netlify/functions/engine`).catch(() => {});
+    } catch { /* ignore */ }
+  }
 
   return json(200, { lead });
 };

@@ -94,6 +94,7 @@ function SingleLead({ campaigns, campaignId, setCampaignId, campaign, onCreated,
   const [last, setLast] = useState('');
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
+  const [status, setStatus] = useState('cold');
   const [samples, setSamples] = useState([]);
   const [busy, setBusy] = useState(false);
 
@@ -101,7 +102,7 @@ function SingleLead({ campaigns, campaignId, setCampaignId, campaign, onCreated,
     if (!email.trim()) { notify('Email is required.'); return; }
     setBusy(true);
     try {
-      await api.createLead({ campaign_id: campaignId, first_name: first, last_name: last, email: email.trim(), company: company.trim(), samples });
+      await api.createLead({ campaign_id: campaignId, first_name: first, last_name: last, email: email.trim(), company: company.trim(), samples, status });
       onCreated();
     } catch (e) { notify(e.message); } finally { setBusy(false); }
   }
@@ -121,6 +122,14 @@ function SingleLead({ campaigns, campaignId, setCampaignId, campaign, onCreated,
       </div>
       <label className="field"><span>Email</span><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" /></label>
       <label className="field"><span>Company</span><input value={company} onChange={(e) => setCompany(e.target.value)} /></label>
+      <label className="field"><span>Status</span>
+        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="cold">Cold</option>
+          <option value="dialogue">Dialogue</option>
+          <option value="current_customer">Current Customer</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </label>
 
       {campaign?.samples_enabled && (
         <label className="field"><span>Samples requested</span>
@@ -137,9 +146,11 @@ function SingleLead({ campaigns, campaignId, setCampaignId, campaign, onCreated,
         <button className="btn ghost" onClick={onClose}>Cancel</button>
       </div>
       <p className="muted-sm" style={{ marginTop: 10 }}>
-        {campaign?.first_email_mode === 'immediate'
-          ? 'First email sends right away (staggered if you add several).'
-          : `First email sends in ${campaign?.first_email_weeks} weeks.`}
+        {status !== 'cold'
+          ? `Added directly as a ${status === 'current_customer' ? 'Current Customer' : status.charAt(0).toUpperCase() + status.slice(1)} lead — no automatic cold emails.`
+          : campaign?.first_email_mode === 'immediate'
+            ? 'First email sends right away (staggered if you add several).'
+            : `First email sends in ${campaign?.first_email_weeks} weeks.`}
       </p>
     </>
   );

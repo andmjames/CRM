@@ -12,6 +12,10 @@
 [functions."engine"]
   schedule = "*/5 * * * *"
 
+# Reply Playbook miner: advances any active mining run every 3 minutes.
+[functions."mine-tick"]
+  schedule = "*/3 * * * *"
+
 # SPA routing — let the client handle routes, but keep functions reachable.
 [[redirects]]
   from = "/api/*"

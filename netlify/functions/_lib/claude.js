@@ -111,4 +111,34 @@ async function generateCommandFromComment({ commentText, lead, campaign }) {
   return parseJson(text);
 }
 
-module.exports = { generateColdFollowup, generateReply, generateCommandFromComment, MODEL };
+// Extract reusable "how to respond" rules from ONE sent reply.
+async function extractReplyRules({ subject, body }) {
+  const system = [
+    'You analyze one reply email a business owner sent to a customer or prospect, and extract reusable instructions for how they respond — the kind of guidance that would help an assistant draft replies in the same voice and with the same policies.',
+    'Output ONLY a JSON array (no markdown), each item: {"category":"...","rule":"...","example":"..."}.',
+    'category is one of: pricing, samples, lead_times, logistics, tone, general.',
+    '"rule" is a concise, generalized imperative instruction (no names, companies, numbers, or one-off specifics) — something reusable across customers.',
+    '"example" is a brief paraphrase of the situation it came from.',
+    'Extract at most 3 rules. If the email is purely one-off with nothing reusable (or is itself cold outreach, not a response), return [].',
+  ].join('\n');
+  const user = `Subject: ${subject || ''}\n\nReply body:\n${(body || '').slice(0, 4000)}\n\nReturn the JSON array.`;
+  const text = await callClaude(system, user);
+  const parsed = parseJson(text);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+// Merge a list of candidate rules into a clean, deduplicated canonical set.
+async function consolidateRules(rules) {
+  const system = [
+    'You merge a list of candidate "how to respond to emails" rules into a deduplicated, canonical set.',
+    'Combine near-duplicates into the single clearest phrasing and sum their support counts.',
+    'Output ONLY a JSON array (no markdown), each item: {"category":"...","rule":"...","example":"...","support_count":<int>}.',
+    'category is one of: pricing, samples, lead_times, logistics, tone, general. Keep rules concise and generalized.',
+  ].join('\n');
+  const user = `Candidate rules:\n${JSON.stringify(rules).slice(0, 12000)}\n\nReturn the merged JSON array.`;
+  const text = await callClaude(system, user);
+  const parsed = parseJson(text);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+module.exports = { generateColdFollowup, generateReply, generateCommandFromComment, extractReplyRules, consolidateRules, MODEL };

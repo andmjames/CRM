@@ -27,4 +27,11 @@ export const api = {
   deleteCampaign: (id) => call('campaigns', { method: 'DELETE', body: { id } }),
   getSettings: () => call('settings'),
   saveSettings: (s) => call('settings', { method: 'POST', body: s }),
+  // Reply Playbook
+  gmailAuthUrl: () => call('gmail-auth-start'),
+  playbookStatus: () => call('playbook-control'),
+  playbookStart: (months, replies_only) => call('playbook-control', { method: 'POST', body: { action: 'start', months, replies_only } }),
+  playbookControl: (action, id) => call('playbook-control', { method: 'POST', body: { action, id } }),
+  playbookRules: () => call('playbook-rules'),
+  playbookRuleAction: (body) => call('playbook-rules', { method: 'POST', body }),
 };

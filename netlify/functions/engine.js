@@ -70,6 +70,11 @@ async function perform(action) {
       try { threadText = await front.getThreadText(lead.front_conversation_id); } catch { /* ignore */ }
       const { data: settings } = await supabase.from('settings').select('key,value');
       const map = Object.fromEntries((settings || []).map((r) => [r.key, r.value]));
+      // Fold in the approved Reply Playbook so learned rules shape the draft.
+      const { data: approved } = await supabase.from('reply_rules').select('rule_text, category').eq('status', 'approved');
+      const playbook = (approved || []).length
+        ? '\n\nReply playbook (learned from past replies — follow these):\n' + approved.map((r) => `- [${r.category}] ${r.rule_text}`).join('\n')
+        : '';
       try {
         const gen = await generateReply({
           kind: 'draft',
@@ -77,7 +82,7 @@ async function perform(action) {
           lead,
           threadText,
           firstNames: [lead.first_name].filter(Boolean),
-          styleGuide: campaign.dialogue_style_guide || campaign.style_guide,
+          styleGuide: (campaign.dialogue_style_guide || campaign.style_guide || '') + playbook,
           globalCorrections: map.global_style_corrections || '',
         });
         body = gen.body || '';

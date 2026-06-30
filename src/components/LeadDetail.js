@@ -81,7 +81,7 @@ export default function LeadDetail({ id, onBack, onChanged, onDeleted, notify })
           </div>
 
           <div className="card card-pad">
-            <p className="section-title">History</p>
+            <p className="section-title">Emails sent from CRM</p>
             {history.length === 0 && <div className="muted-sm">No messages sent yet.</div>}
             {history.map((h) => (
               <div key={h.id} className="upcoming-item">

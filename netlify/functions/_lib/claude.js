@@ -87,20 +87,20 @@ async function generateReply({ kind, campaign, lead, threadText, firstNames, sty
 }
 
 // Interpret a free-form Front comment as a single structured action.
-// Returns { action, status?, days?, note? }.
+// Returns { action, status?, amount?, unit?, days?, note? }.
 async function generateCommandFromComment({ commentText, lead, campaign }) {
   const system = [
     'You convert a short internal instruction (a Front comment, with the "@crm" mention removed) about an outreach lead into ONE structured action.',
-    'Output ONLY valid JSON, no markdown: {"action":"...","status":"...","days":0,"note":"..."}.',
+    'Output ONLY valid JSON, no markdown: {"action":"...","status":"...","amount":0,"unit":"...","note":"..."}.',
     'Valid "action" values:',
-    '- "remind": schedule a follow-up reminder. Put the delay in "days" (2 weeks = 14, 1 month = 30). Put a short reminder message in "note" (e.g. "This is your reminder to follow up." — fold in any specifics mentioned).',
-    '- "pause": pause scheduled emails for N days (include "days").',
+    '- "remind": schedule a follow-up reminder. Express the delay as "amount" (a number) and "unit" (one of "minutes","hours","days","weeks","months"), taken exactly from the instruction. Put a short reminder message in "note" (fold in any specifics mentioned).',
+    '- "pause": pause scheduled emails for N days (include "amount" and "unit").',
     '- "resume": unpause the lead.',
     '- "set_status": change status (include "status" = cold|dialogue|current_customer|inactive).',
     '- "stop": permanently stop contacting this lead (do not contact).',
     '- "note": just record the text as an internal note (include "note").',
     '- "none": no actionable instruction.',
-    'Example: "follow up in 2 weeks on this" -> {"action":"remind","days":14,"note":"This is your reminder to follow up."}. Include only relevant keys. If ambiguous, use "none".',
+    'Use the exact amount and unit stated. Examples: "follow up in 2 minutes to make sure he likes it" -> {"action":"remind","amount":2,"unit":"minutes","note":"Follow up to make sure he likes it."}; "follow up in 2 weeks on this" -> {"action":"remind","amount":2,"unit":"weeks","note":"This is your reminder to follow up."}. Include only relevant keys. If ambiguous, use "none".',
   ].join('\n');
   const user = [
     `Lead: ${lead.first_name || ''} ${lead.last_name || ''} <${lead.email}>, current status ${lead.status}, campaign ${campaign?.name || ''}.`,

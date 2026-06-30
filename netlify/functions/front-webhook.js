@@ -302,6 +302,16 @@ exports.handler = async (event) => {
   }
 };
 
+// Convert a reminder delay (amount+unit, with day/minute fallbacks) to milliseconds.
+function remindMs(cmd) {
+  const UNIT_MS = { minutes: 60000, hours: 3600000, days: 86400000, weeks: 604800000, months: 2592000000 };
+  const amount = Number(cmd.amount);
+  if (amount > 0 && cmd.unit && UNIT_MS[cmd.unit]) return amount * UNIT_MS[cmd.unit];
+  if (Number(cmd.days) > 0) return Number(cmd.days) * UNIT_MS.days;       // backward compatible
+  if (Number(cmd.minutes) > 0) return Number(cmd.minutes) * UNIT_MS.minutes;
+  return 14 * UNIT_MS.days; // default: 2 weeks
+}
+
 async function applyCommand(cmd, lead, cId) {
   switch (cmd.action) {
     case 'pause':
@@ -325,8 +335,7 @@ async function applyCommand(cmd, lead, cId) {
       if (cId) { try { await front.syncStatusTag(cId, 'inactive'); } catch { /* ignore */ } }
       break;
     case 'remind': {
-      const days = Number(cmd.days) > 0 ? Number(cmd.days) : 14;
-      const when = new Date(Date.now() + days * 86400000).toISOString();
+      const when = new Date(Date.now() + remindMs(cmd)).toISOString();
       let body = (cmd.note && String(cmd.note).trim()) || 'This is your reminder to follow up.';
       body = body.replace(/@crm/ig, '').trim(); // never echo the trigger (avoids re-firing)
       await supabase.from('scheduled_actions').insert({

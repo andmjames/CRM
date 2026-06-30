@@ -26,16 +26,19 @@ const _handler = async (event) => {
   const { data: lead, error } = await supabase.from('leads').update(patch).eq('id', id).select('*').maybeSingle();
   if (error) return json(500, { error: error.message });
 
-  // Leaving Cold (or going Inactive/Pause) cancels pending automated SENDS.
+  // Leaving Cold cancels pending automated SENDS. Becoming a Current Customer
+  // also cancels pending dialogue DRAFTS — but keeps @crm reminder comments.
   if (status && status !== 'cold') {
+    const types = status === 'current_customer' ? ['send', 'draft'] : ['send'];
     await supabase.from('scheduled_actions')
       .update({ status: 'canceled' })
-      .eq('lead_id', id).eq('action_type', 'send').eq('status', 'pending');
+      .eq('lead_id', id).eq('status', 'pending').in('action_type', types);
   }
   if (status === 'inactive') {
+    // Fully inactive — cancel everything still pending, reminders included.
     await supabase.from('scheduled_actions')
       .update({ status: 'canceled' })
-      .eq('lead_id', id).in('status', ['pending']);
+      .eq('lead_id', id).eq('status', 'pending');
   }
 
   // Mirror a status change onto the Front conversation tags (awaited so it

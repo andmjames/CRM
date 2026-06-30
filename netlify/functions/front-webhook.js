@@ -76,6 +76,14 @@ async function cancelPendingSends(leadId) {
     .eq('lead_id', leadId).eq('action_type', 'send').eq('status', 'pending');
 }
 
+// Stop all automatic outreach for a lead — pending cold sends AND dialogue drafts.
+// Leaves 'comment' actions (the @crm reminders) intact, so Current Customers keep
+// their scheduled reminders while never being auto-emailed or auto-drafted.
+async function cancelAutomation(leadId) {
+  await supabase.from('scheduled_actions').update({ status: 'canceled' })
+    .eq('lead_id', leadId).eq('status', 'pending').in('action_type', ['send', 'draft']);
+}
+
 // Rule webhooks nest fields differently than app webhooks and the recipient is
 // only present with "Send Full Event Data" on — so search the whole payload.
 function deepCollect(obj, test, acc = []) {
@@ -175,11 +183,14 @@ exports.handler = async (event) => {
         for (const t of TAG_PRIORITY) if (present.includes(t)) { chosen = t; break; }
         if (chosen === 'do not contact') {
           await supabase.from('leads').update({ status: 'inactive', paused: true, front_conversation_id: cId || lead.front_conversation_id }).eq('id', lead.id);
-          await cancelPendingSends(lead.id);
+          await cancelAutomation(lead.id);
           await supabase.from('suppression_list').upsert({ email: lead.email, reason: 'Do Not Contact (Front tag)' }, { onConflict: 'email' });
         } else if (chosen && STATUS_BY_TAG[chosen]) {
-          await supabase.from('leads').update({ status: STATUS_BY_TAG[chosen], front_conversation_id: cId || lead.front_conversation_id }).eq('id', lead.id);
-          if (STATUS_BY_TAG[chosen] !== 'cold') await cancelPendingSends(lead.id);
+          const newStatus = STATUS_BY_TAG[chosen];
+          await supabase.from('leads').update({ status: newStatus, front_conversation_id: cId || lead.front_conversation_id }).eq('id', lead.id);
+          // Current Customer / inactive: stop all auto sends AND drafts (reminders stay).
+          if (newStatus === 'current_customer' || newStatus === 'inactive') await cancelAutomation(lead.id);
+          else if (newStatus !== 'cold') await cancelPendingSends(lead.id);
         }
       }
       return json(200, { ok: true, handled: 'tag', matched: !!lead });
@@ -302,13 +313,14 @@ async function applyCommand(cmd, lead, cId) {
     case 'set_status':
       if (['cold', 'dialogue', 'current_customer', 'inactive'].includes(cmd.status)) {
         await supabase.from('leads').update({ status: cmd.status }).eq('id', lead.id);
-        if (cmd.status !== 'cold') await cancelPendingSends(lead.id);
+        if (cmd.status === 'current_customer' || cmd.status === 'inactive') await cancelAutomation(lead.id);
+        else if (cmd.status !== 'cold') await cancelPendingSends(lead.id);
         if (cId) { try { await front.syncStatusTag(cId, cmd.status); } catch { /* ignore */ } }
       }
       break;
     case 'stop':
       await supabase.from('leads').update({ status: 'inactive', paused: true }).eq('id', lead.id);
-      await cancelPendingSends(lead.id);
+      await cancelAutomation(lead.id);
       await supabase.from('suppression_list').upsert({ email: lead.email, reason: 'comment command: stop' }, { onConflict: 'email' });
       if (cId) { try { await front.syncStatusTag(cId, 'inactive'); } catch { /* ignore */ } }
       break;

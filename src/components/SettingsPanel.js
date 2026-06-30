@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import ManageCampaigns from './ManageCampaigns';
+import Playbook from './Playbook';
 
 export default function SettingsPanel({ notify, onChanged }) {
   const [s, setS] = useState(null);
@@ -69,6 +70,9 @@ export default function SettingsPanel({ notify, onChanged }) {
 
       <div className="divider" style={{ margin: '28px 0 20px' }} />
       <ManageCampaigns notify={notify} onChanged={onChanged || (() => {})} />
+
+      <div className="divider" style={{ margin: '28px 0 20px' }} />
+      <Playbook notify={notify} />
     </>
   );
 }

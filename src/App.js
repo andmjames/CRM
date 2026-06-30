@@ -6,7 +6,6 @@ import Leads from './components/Leads';
 import UpcomingEmails from './components/UpcomingEmails';
 import LeadDetail from './components/LeadDetail';
 import SettingsPanel from './components/SettingsPanel';
-import Playbook from './components/Playbook';
 import AddLeadModal from './components/AddLeadModal';
 
 export default function App() {
@@ -51,7 +50,6 @@ export default function App() {
           {tab('home', 'Dashboard')}
           {tab('leads', 'Leads')}
           {tab('upcoming', 'Upcoming')}
-          {tab('playbook', 'Playbook')}
           {tab('settings', 'Settings')}
         </nav>
         <div className="spacer" />
@@ -76,8 +74,6 @@ export default function App() {
             <Leads data={data} onOpenLead={openLead} campaignFilter={leadsFilter} onAddLead={() => setAdding(true)} />
           ) : view === 'upcoming' ? (
             <UpcomingEmails onOpenLead={openLead} notify={notify} />
-          ) : view === 'playbook' ? (
-            <Playbook notify={notify} />
           ) : (
             <SettingsPanel notify={notify} onChanged={load} />
           )

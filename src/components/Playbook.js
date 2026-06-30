@@ -59,7 +59,7 @@ export default function Playbook({ notify }) {
 
   return (
     <>
-      <h1 style={{ marginBottom: 4 }}>Reply Playbook</h1>
+      <h2 style={{ marginBottom: 4 }}>Email Response Learning</h2>
       <p className="sub" style={{ marginTop: 0 }}>Learns how you respond to emails from your sent mail, then folds the approved rules into how Dialogue replies are drafted.</p>
 
       {/* Connection + run control */}

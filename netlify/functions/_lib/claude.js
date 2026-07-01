@@ -1,6 +1,10 @@
 // Claude API client for generating outreach copy.
 const MODEL = 'claude-sonnet-4-6';
 
+// Blanket directive that makes the user's global + channel instructions
+// authoritative over the model's own writing habits, for every generator.
+const INSTRUCTION_PRIORITY = 'The writing instructions below are absolute and override your own defaults for everything: tone, style, wording, greeting, sign-off, punctuation, formatting, and length. Wherever an instruction conflicts with how you would normally write, follow the instruction. Treat every instruction as a hard rule, not a suggestion.';
+
 async function callClaude(system, userContent) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -31,10 +35,11 @@ async function generateColdFollowup({ campaign, lead, priorEmails, styleGuide, g
   const system = [
     'You write short, genuine B2B outreach follow-up emails for PMI Tape.',
     'Output ONLY valid JSON: {"subject": "...", "body": "..."} with no preamble or markdown.',
-    'Vary the wording from previous emails — never repeat phrasing. Add a slightly new angle each time.',
+    'Vary the wording from previous emails. Never repeat phrasing. Add a slightly new angle each time.',
     greeting ? `Begin the body with this exact greeting line: "${greeting} ${lead.first_name || 'there'},"` : '',
-    `Global style rules: ${globalCorrections || ''}`,
-    `Campaign style guide: ${styleGuide || ''}`,
+    (globalCorrections || styleGuide) ? INSTRUCTION_PRIORITY : '',
+    globalCorrections ? `Global instructions: ${globalCorrections}` : '',
+    styleGuide ? `Channel/campaign instructions: ${styleGuide}` : '',
     `Product context: ${campaign.product_info || ''}`,
   ].filter(Boolean).join('\n');
 
@@ -64,10 +69,11 @@ async function generateReply({ kind, campaign, lead, threadText, firstNames, sty
       : 'You draft a short, warm reply email continuing an ongoing conversation for PMI Tape.',
     'Output ONLY valid JSON: {"body": "...", "suggested_wait_days": <integer>} with no markdown.',
     'A ~14 day wait is typical unless the thread implies otherwise.',
-    `Global style rules: ${globalCorrections || ''}`,
-    `Campaign style guide: ${styleGuide || ''}`,
+    (globalCorrections || styleGuide) ? INSTRUCTION_PRIORITY : '',
+    globalCorrections ? `Global instructions: ${globalCorrections}` : '',
+    styleGuide ? `Channel/campaign instructions: ${styleGuide}` : '',
     `Product context: ${campaign.product_info || ''}`,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
   const greet = firstNames && firstNames.length > 1
     ? `Greet all recipients by first name: ${firstNames.join(', ')}.`
@@ -148,11 +154,12 @@ async function consolidateRules(rules) {
 // tag). Works on any conversation, lead or not. Returns the reply body only.
 async function generateThreadReply({ threadText, playbook, signOff }) {
   const system = [
-    'You draft a reply to the most recent email in this thread, on behalf of the business owner. The draft will be reviewed before sending — never assume it is sent.',
+    'You draft a reply to the most recent email in this thread, on behalf of the business owner. The draft will be reviewed before sending. Never assume it is sent.',
     'Write ONLY the reply body: warm, concise, professional, and genuinely helpful. No subject line, no "Draft:" prefix, no meta commentary.',
     'Answer what was asked and move things forward. If you lack a specific fact (a price, a date), say you will follow up rather than inventing it.',
-    playbook ? `Follow these reply rules:${playbook}` : '',
-    `End with a brief sign-off${signOff ? ` as ${signOff}` : ''}.`,
+    playbook
+      ? `${INSTRUCTION_PRIORITY}\n\nWriting instructions:\n${playbook}`
+      : (signOff ? `End with a brief sign-off as ${signOff}.` : 'End with a brief, warm sign-off.'),
   ].filter(Boolean).join('\n');
   const user = `Email thread (oldest first, most recent last):\n${(threadText || '').slice(0, 8000)}\n\nWrite the reply body.`;
   return (await callClaude(system, user)).trim();

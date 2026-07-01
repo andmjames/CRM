@@ -40,7 +40,7 @@ async function perform(action) {
     const instructions = await replyInstructions(channelAddress);
     let threadText = '';
     try { threadText = await front.getThreadText(action.front_conversation_id); } catch { /* ignore */ }
-    const body = await generateThreadReply({ threadText, playbook: instructions, signOff: 'Andrew' });
+    const body = await generateThreadReply({ threadText, playbook: instructions });
     await front.createDraftReply({ conversationId: action.front_conversation_id, channelAddress, body });
     try { await front.removeTag(action.front_conversation_id, 'Draft AI Response'); } catch { /* ignore */ }
     await supabase.from('scheduled_actions')

@@ -68,7 +68,10 @@ function UpcomingRow({ action, onChanged, onOpenLead, notify }) {
   const [busy, setBusy] = useState(false);
 
   const lead = action.lead || {};
-  const who = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email || 'Unknown';
+  const standalone = !action.lead_id;
+  const who = standalone
+    ? (action.label || 'Front conversation')
+    : ([lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email || 'Unknown');
 
   async function save() {
     setBusy(true);
@@ -78,7 +81,7 @@ function UpcomingRow({ action, onChanged, onOpenLead, notify }) {
     } catch (e) { notify(e.message); } finally { setBusy(false); }
   }
   async function cancel() {
-    if (!window.confirm(`Cancel this ${typeLabel(action.action_type).toLowerCase()} to ${who}?`)) return;
+    if (!window.confirm(`Cancel this ${standalone ? 'reminder' : typeLabel(action.action_type).toLowerCase()} to ${who}?`)) return;
     await api.updateAction({ id: action.id, cancel: true });
     notify('Canceled.'); onChanged();
   }
@@ -87,15 +90,19 @@ function UpcomingRow({ action, onChanged, onOpenLead, notify }) {
     <div className="upcoming-item">
       <div className="upcoming-head">
         <strong>
-          {typeLabel(action.action_type)} · step {action.step}
+          {standalone ? 'Reminder' : `${typeLabel(action.action_type)} · step ${action.step}`}
           {action.is_override ? ' · edited' : ''}
           {lead.paused ? ' · lead paused' : ''}
         </strong>
         <span className="muted-sm">{fmtDateTime(action.scheduled_for)}</span>
       </div>
       <div className="muted-sm" style={{ marginBottom: 6 }}>
-        To <button className="linklike" onClick={() => onOpenLead(action.lead_id)}>{who}</button>
-        {lead.email ? ` (${lead.email})` : ''}{action.campaign?.name ? ` · ${action.campaign.name}` : ''}
+        {standalone ? (
+          <>On <strong>{who}</strong> · not a lead in the CRM</>
+        ) : (
+          <>To <button className="linklike" onClick={() => onOpenLead(action.lead_id)}>{who}</button>
+          {lead.email ? ` (${lead.email})` : ''}{action.campaign?.name ? ` · ${action.campaign.name}` : ''}</>
+        )}
       </div>
 
       {!edit ? (

@@ -78,12 +78,11 @@ export default function ManageCampaigns({ notify, onChanged }) {
           <label className="field"><span>Product info (shared AI context for all emails)</span><textarea value={form.product_info} onChange={set('product_info')} /></label>
 
           <div className="divider" />
-          <h2 style={{ margin: '4px 0 2px' }}>Cold Emails</h2>
-          <p className="sub" style={{ margin: '0 0 12px' }}>The outbound sequence sent automatically to new leads.</p>
+          <h2 style={{ margin: '4px 0 2px' }}>Email Drafting Instructions</h2>
+          <p className="sub" style={{ margin: '0 0 14px' }}>Separate instructions for each type of email this campaign sends.</p>
 
-          <label className="field"><span>Style guide (tone for AI cold follow-ups)</span><textarea value={form.style_guide} onChange={set('style_guide')} /></label>
-
-          <p className="section-title">First email</p>
+          <p className="section-title">Cold Initial Email</p>
+          <p className="sub" style={{ margin: '0 0 8px' }}>The first outbound email. Sent exactly as written below — no AI. Placeholders: GREETING (Good morning/afternoon by send time), FIRST_NAME, SAMPLES.</p>
           <div className="row" style={{ gap: 12 }}>
             <label className="field" style={{ flex: 1 }}><span>When to send</span>
               <select value={form.first_email_mode} onChange={set('first_email_mode')}>
@@ -95,10 +94,13 @@ export default function ManageCampaigns({ notify, onChanged }) {
               <label className="field" style={{ width: 120 }}><span>Weeks</span><input type="number" value={form.first_email_weeks} onChange={set('first_email_weeks')} /></label>
             )}
           </div>
-          <label className="field"><span>Email 1 subject</span><input value={form.subject} onChange={set('subject')} /></label>
-          <label className="field"><span>Email 1 body — placeholders: GREETING (Good morning/afternoon by send time), FIRST_NAME, SAMPLES</span><textarea value={form.body} onChange={set('body')} style={{ minHeight: 140 }} /></label>
+          <label className="field"><span>Subject</span><input value={form.subject} onChange={set('subject')} /></label>
+          <label className="field"><span>Body (prewritten — sent as-is, no AI)</span><textarea value={form.body} onChange={set('body')} style={{ minHeight: 140 }} /></label>
 
-          <p className="section-title">Follow-ups (AI-generated)</p>
+          <div className="divider" />
+          <p className="section-title">Cold Follow Up Emails</p>
+          <p className="sub" style={{ margin: '0 0 8px' }}>AI-written follow-ups to leads who haven&rsquo;t replied. These instructions guide their tone and content.</p>
+          <label className="field"><span>Instructions for cold follow-ups</span><textarea value={form.style_guide} onChange={set('style_guide')} /></label>
           <label className="field"><span>Weeks after each previous email (comma-separated)</span><input value={form.followup_weeks} onChange={set('followup_weeks')} placeholder="4,6,8,12,16,20,24,28,32,36,40" /></label>
           <div className="row" style={{ gap: 12 }}>
             <label className="field" style={{ width: 160 }}><span>Hard cap (total emails)</span><input type="number" value={form.max_emails} onChange={set('max_emails')} /></label>
@@ -109,20 +111,17 @@ export default function ManageCampaigns({ notify, onChanged }) {
           </div>
 
           <div className="divider" />
-          <h2 style={{ margin: '4px 0 2px' }}>Dialogue Emails</h2>
-          <p className="sub" style={{ margin: '0 0 12px' }}>Draft responses (for your review) once a lead replies and becomes a Dialogue lead.</p>
+          <p className="section-title">Dialogue Follow Up Drafts</p>
+          <p className="sub" style={{ margin: '0 0 8px' }}>Scheduled check-in drafts (for your review) after a lead replies — making sure the product is working well, offering more samples to test, helping them find a dealer, or just seeing if you can help. The instructions below guide these scheduled check-ins.</p>
+          <label className="field"><span>Instructions for dialogue follow-up check-ins</span><textarea value={form.dialogue_style_guide} onChange={set('dialogue_style_guide')} /></label>
+          <label className="field"><span>Weeks after each previous email (comma-separated)</span><input value={form.dialogue_followup_weeks} onChange={set('dialogue_followup_weeks')} placeholder="2,4,8" /></label>
+          <label className="field" style={{ width: 180 }}><span>Hard cap (total drafts)</span><input type="number" value={form.dialogue_max_drafts} onChange={set('dialogue_max_drafts')} /></label>
 
-          <label className="row" style={{ gap: 8, alignItems: 'center' }}>
+          <label className="row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
             <input type="checkbox" style={{ width: 'auto' }} checked={form.immediate_draft_response !== false} onChange={set('immediate_draft_response')} />
             <span style={{ fontWeight: 600 }}>Immediate Draft Response</span>
           </label>
-          <p className="sub" style={{ margin: '6px 0 14px 26px' }}>Draft a reply the moment a lead responds. The scheduled draft responses below run either way — turn this off to only get the scheduled ones.</p>
-
-          <label className="field"><span>Style guide (tone for AI-drafted replies)</span><textarea value={form.dialogue_style_guide} onChange={set('dialogue_style_guide')} /></label>
-
-          <p className="section-title">Scheduled draft responses</p>
-          <label className="field"><span>Weeks after each previous email (comma-separated)</span><input value={form.dialogue_followup_weeks} onChange={set('dialogue_followup_weeks')} placeholder="2,4,8" /></label>
-          <label className="field" style={{ width: 180 }}><span>Hard cap (total drafts)</span><input type="number" value={form.dialogue_max_drafts} onChange={set('dialogue_max_drafts')} /></label>
+          <p className="sub" style={{ margin: '6px 0 4px 26px' }}>Draft a reply the moment a lead responds, using your <strong>Email Writing Instructions</strong> (global + this channel&rsquo;s address) rather than the check-in instructions above. The scheduled check-in drafts run either way — turn this off to get only the scheduled ones.</p>
 
           <div className="row" style={{ marginTop: 16 }}>
             <button className="btn" disabled={busy} onClick={save}>Save campaign</button>

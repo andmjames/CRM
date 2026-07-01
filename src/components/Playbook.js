@@ -12,7 +12,6 @@ export default function Playbook({ notify }) {
   const [rules, setRules] = useState([]);
   const [months, setMonths] = useState(24);
   const [busy, setBusy] = useState(false);
-  const [showApproved, setShowApproved] = useState(false);
 
   const loadStatus = useCallback(async () => {
     try { setStatus(await api.playbookStatus()); } catch (e) { notify(e.message); }
@@ -56,7 +55,6 @@ export default function Playbook({ notify }) {
 
   const run = status?.run;
   const suggested = rules.filter((r) => r.status === 'suggested');
-  const approved = rules.filter((r) => r.status === 'approved');
 
   return (
     <>
@@ -130,7 +128,7 @@ export default function Playbook({ notify }) {
                 <div style={{ fontSize: 14 }}>{r.rule_text}</div>
                 {r.example && <div className="muted-sm" style={{ marginTop: 3 }}>{r.example}</div>}
                 <div className="row" style={{ marginTop: 8, alignItems: 'center' }}>
-                  <span className="muted-sm">seen {r.support_count}×</span>
+                  <span className="muted-sm">seen {r.support_count}× · {r.account_email || 'all channels'}</span>
                   <div className="spacer" />
                   <button className="btn ghost sm" onClick={() => ruleAction({ action: 'set_status', id: r.id, status: 'approved' })}>Approve</button>
                   <button className="btn ghost sm danger" onClick={() => ruleAction({ action: 'set_status', id: r.id, status: 'rejected' })}>Reject</button>
@@ -140,34 +138,7 @@ export default function Playbook({ notify }) {
           </div>
         );
       })}
-
-      {/* Approved rules (collapsible) */}
-      {approved.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <button
-            className="btn ghost"
-            onClick={() => setShowApproved((v) => !v)}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
-          >
-            <span>Approved rules <span className="muted-sm">({approved.length})</span> — applied to every Dialogue reply draft</span>
-            <span style={{ transform: showApproved ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>▾</span>
-          </button>
-          {showApproved && (
-            <div style={{ marginTop: 10 }}>
-              {approved.map((r) => (
-                <div className="card" key={r.id} style={{ padding: '10px 12px', marginBottom: 8 }}>
-                  <div style={{ fontSize: 14 }}><span className="muted-sm" style={{ textTransform: 'capitalize' }}>[{r.category.replace('_', ' ')}] </span>{r.rule_text}</div>
-                  <div className="row" style={{ marginTop: 8 }}>
-                    <div className="spacer" />
-                    <button className="btn ghost sm" onClick={() => ruleAction({ action: 'set_status', id: r.id, status: 'suggested' })}>Unapprove</button>
-                    <button className="btn ghost sm danger" onClick={() => ruleAction({ action: 'delete', id: r.id })}>Delete</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <p className="muted-sm" style={{ marginTop: 14 }}>Approved rules live under <strong>Email Writing Instructions</strong> above, where you can search, edit, and add your own.</p>
     </>
   );
 }

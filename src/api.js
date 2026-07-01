@@ -34,4 +34,6 @@ export const api = {
   playbookControl: (action, id) => call('playbook-control', { method: 'POST', body: { action, id } }),
   playbookRules: () => call('playbook-rules'),
   playbookRuleAction: (body) => call('playbook-rules', { method: 'POST', body }),
+  emailInstructions: () => call('email-instructions'),
+  saveEmailInstructions: (scope, instructions) => call('email-instructions', { method: 'POST', body: { scope, instructions } }),
 };

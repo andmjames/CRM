@@ -8,7 +8,7 @@ const _handler = async (event) => {
 
   const { data, error } = await supabase
     .from('scheduled_actions')
-    .select('id, action_type, step, scheduled_for, subject, generated_body, is_override, lead_id, ' +
+    .select('id, action_type, step, scheduled_for, subject, generated_body, is_override, lead_id, front_conversation_id, label, ' +
             'lead:leads(first_name,last_name,email,status,paused), campaign:campaigns(name)')
     .eq('status', 'pending')
     .order('scheduled_for', { ascending: true });

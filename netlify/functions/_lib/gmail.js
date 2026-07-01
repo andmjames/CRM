@@ -73,9 +73,15 @@ async function currentAccount() {
   return data || null;
 }
 
-// Valid access token for the stored account, refreshing if needed.
-async function getAccessToken() {
-  const row = await currentAccount();
+// Valid access token for a specific account (or the most recent), refreshing if needed.
+async function getAccessToken(accountEmail) {
+  let row;
+  if (accountEmail) {
+    const { data } = await supabase.from('gmail_token_cache').select('*').eq('account_email', accountEmail).maybeSingle();
+    row = data;
+  } else {
+    row = await currentAccount();
+  }
   if (!row) throw new Error('Gmail not connected — authorize first.');
   const fresh = row.access_token && row.expires_at && new Date(row.expires_at).getTime() > Date.now() + 60000;
   if (fresh) return { token: row.access_token, account: row.account_email };

@@ -21,18 +21,21 @@ async function runConcurrent(items, n, fn) {
   return out;
 }
 
-// Insert a candidate rule, or bump support_count if an equivalent one exists.
-async function mergeRule({ category, rule, example }) {
+// Insert a candidate rule, or bump support_count if an equivalent one exists
+// (deduped within the same account).
+async function mergeRule({ category, rule, example }, accountEmail) {
   const cat = ['pricing', 'samples', 'lead_times', 'logistics', 'tone', 'general'].includes(category) ? category : 'general';
   const text = String(rule || '').trim();
   if (!text) return;
-  const { data: existing } = await supabase.from('reply_rules')
+  let q = supabase.from('reply_rules')
     .select('id, rule_text, support_count').eq('category', cat).neq('status', 'rejected');
+  q = accountEmail ? q.eq('account_email', accountEmail) : q.is('account_email', null);
+  const { data: existing } = await q;
   const hit = (existing || []).find((r) => norm(r.rule_text) === norm(text));
   if (hit) {
     await supabase.from('reply_rules').update({ support_count: (hit.support_count || 1) + 1, updated_at: new Date().toISOString() }).eq('id', hit.id);
   } else {
-    await supabase.from('reply_rules').insert({ category: cat, rule_text: text, example: example || null, status: 'suggested' });
+    await supabase.from('reply_rules').insert({ category: cat, rule_text: text, example: example || null, status: 'suggested', account_email: accountEmail || null });
   }
 }
 
@@ -91,7 +94,7 @@ async function doExtract(run) {
   });
 
   for (const r of results) {
-    for (const rule of (r.rules || []).slice(0, 3)) await mergeRule(rule);
+    for (const rule of (r.rules || []).slice(0, 3)) await mergeRule(rule, run.account_email);
     await supabase.from('mined_emails').update({ processed: true }).eq('id', r.id);
   }
   await supabase.from('mining_runs').update({
@@ -109,7 +112,7 @@ const _handler = async () => {
   try {
     let result;
     if (run.phase === 'fetching') {
-      const { token } = await gmail.getAccessToken();
+      const { token } = await gmail.getAccessToken(run.account_email);
       result = await doFetch(run, token);
     } else {
       result = await doExtract(run);

@@ -150,7 +150,7 @@ async function enqueueNextColdEmail({ lead, campaign, justSentStep }) {
     .order('step', { ascending: true });
 
   const settings = await getSettings();
-  const globalCorrections = settings.global_style_corrections || '';
+  const globalCorrections = await getInstructions('global');
 
   const start = Number(settings.send_window_start_hour || 8);
   const end = Number(settings.send_window_end_hour || 16);
@@ -267,6 +267,43 @@ async function enqueueNextDialogueDraft({ lead, campaign, justDraftedStep }) {
   });
 }
 
+// Free-text email-writing instructions for a scope ('global' or an email address).
+async function getInstructions(scope) {
+  if (!scope) return '';
+  const { data } = await supabase.from('email_instructions')
+    .select('instructions').eq('scope', String(scope).toLowerCase()).maybeSingle();
+  return (data && data.instructions) ? data.instructions.trim() : '';
+}
+
+// Build the reply-draft style guide from global + account-specific instructions
+// plus the approved rules for that channel. Used for immediate reply drafts and
+// the "Draft AI Response" tag.
+async function replyInstructions(accountEmail) {
+  const [global, account, rules] = await Promise.all([
+    getInstructions('global'),
+    getInstructions(accountEmail),
+    approvedPlaybook(accountEmail),
+  ]);
+  const parts = [];
+  if (account) parts.push(account);
+  if (global) parts.push(global);
+  let out = parts.join('\n\n');
+  if (rules) out += rules; // approvedPlaybook already prefixes its own heading/newlines
+  return out;
+}
+
+// Build the approved Reply Playbook text for a given email account. Rules tagged
+// with that account apply, plus any global (account_email NULL) rules. When no
+// account is given, all approved rules apply.
+async function approvedPlaybook(accountEmail) {
+  const { data } = await supabase.from('reply_rules')
+    .select('rule_text, category, account_email').eq('status', 'approved');
+  const rules = (data || []).filter((r) => !accountEmail || !r.account_email || r.account_email === accountEmail);
+  if (!rules.length) return '';
+  return '\n\nReply playbook (learned from past replies — follow these):\n'
+    + rules.map((r) => `- [${r.category}] ${r.rule_text}`).join('\n');
+}
+
 // Wrap a handler so any thrown error becomes a readable JSON 500 instead of a 502.
 function safe(handler) {
   return async (event, context) => {
@@ -288,4 +325,7 @@ module.exports = {
   enqueueNextColdEmail,
   startDialogueDrafts,
   enqueueNextDialogueDraft,
+  approvedPlaybook,
+  getInstructions,
+  replyInstructions,
 };

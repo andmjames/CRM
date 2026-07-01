@@ -87,23 +87,26 @@ async function generateReply({ kind, campaign, lead, threadText, firstNames, sty
 }
 
 // Interpret a free-form Front comment as a single structured action.
-// Returns { action, status?, amount?, unit?, days?, note? }.
-async function generateCommandFromComment({ commentText, lead, campaign }) {
+// Returns { action, status?, amount?, unit?, at?, note? }.
+async function generateCommandFromComment({ commentText, lead, campaign, nowText }) {
   const system = [
-    'You convert a short internal instruction (a Front comment, with the "@crm" mention removed) about an outreach lead into ONE structured action.',
-    'Output ONLY valid JSON, no markdown: {"action":"...","status":"...","amount":0,"unit":"...","note":"..."}.',
+    'You convert a short internal instruction (a Front comment, with the "@crm" mention removed) into ONE structured action.',
+    'Output ONLY valid JSON, no markdown: {"action":"...","status":"...","amount":0,"unit":"...","at":"...","note":"..."}.',
+    nowText ? `The current local time is ${nowText} (America/Indiana/Indianapolis). Use it to resolve absolute times.` : '',
     'Valid "action" values:',
-    '- "remind": schedule a follow-up reminder. Express the delay as "amount" (a number) and "unit" (one of "minutes","hours","days","weeks","months"), taken exactly from the instruction. Put a short reminder message in "note" (fold in any specifics mentioned).',
-    '- "pause": pause scheduled emails for N days (include "amount" and "unit").',
+    '- "remind": schedule a reminder. For a RELATIVE delay ("in 2 minutes", "in 3 days") set "amount" (number) and "unit" (one of "minutes","hours","days","weeks","months"). For an ABSOLUTE time ("tomorrow at 9am", "next Monday 2pm", "Friday morning") set "at" to a local datetime "YYYY-MM-DD HH:mm" (24-hour) computed from the current local time. Put a short reminder message in "note" (fold in any specifics).',
+    '- "pause": pause scheduled emails (include "amount" and "unit").',
     '- "resume": unpause the lead.',
     '- "set_status": change status (include "status" = cold|dialogue|current_customer|inactive).',
     '- "stop": permanently stop contacting this lead (do not contact).',
     '- "note": just record the text as an internal note (include "note").',
     '- "none": no actionable instruction.',
-    'Use the exact amount and unit stated. Examples: "follow up in 2 minutes to make sure he likes it" -> {"action":"remind","amount":2,"unit":"minutes","note":"Follow up to make sure he likes it."}; "follow up in 2 weeks on this" -> {"action":"remind","amount":2,"unit":"weeks","note":"This is your reminder to follow up."}. Include only relevant keys. If ambiguous, use "none".',
-  ].join('\n');
+    'Examples: "follow up in 2 minutes to make sure he likes it" -> {"action":"remind","amount":2,"unit":"minutes","note":"Follow up to make sure he likes it."}; "remind me to follow up tomorrow at 9am" -> {"action":"remind","at":"<tomorrow> 09:00","note":"Follow up."}. Include only relevant keys. If ambiguous, use "none".',
+  ].filter(Boolean).join('\n');
   const user = [
-    `Lead: ${lead.first_name || ''} ${lead.last_name || ''} <${lead.email}>, current status ${lead.status}, campaign ${campaign?.name || ''}.`,
+    lead
+      ? `Lead: ${lead.first_name || ''} ${lead.last_name || ''} <${lead.email}>, current status ${lead.status}, campaign ${campaign?.name || ''}.`
+      : 'No matching lead in the CRM — this is a standalone reminder on a Front conversation. Only "remind" or "note" apply.',
     `Comment: "${commentText}"`,
     'Return the JSON action.',
   ].join('\n');
@@ -141,4 +144,18 @@ async function consolidateRules(rules) {
   return Array.isArray(parsed) ? parsed : [];
 }
 
-module.exports = { generateColdFollowup, generateReply, generateCommandFromComment, extractReplyRules, consolidateRules, MODEL };
+// Draft a reply to the latest message in a thread (for the "Draft AI Response"
+// tag). Works on any conversation, lead or not. Returns the reply body only.
+async function generateThreadReply({ threadText, playbook, signOff }) {
+  const system = [
+    'You draft a reply to the most recent email in this thread, on behalf of the business owner. The draft will be reviewed before sending — never assume it is sent.',
+    'Write ONLY the reply body: warm, concise, professional, and genuinely helpful. No subject line, no "Draft:" prefix, no meta commentary.',
+    'Answer what was asked and move things forward. If you lack a specific fact (a price, a date), say you will follow up rather than inventing it.',
+    playbook ? `Follow these reply rules:${playbook}` : '',
+    `End with a brief sign-off${signOff ? ` as ${signOff}` : ''}.`,
+  ].filter(Boolean).join('\n');
+  const user = `Email thread (oldest first, most recent last):\n${(threadText || '').slice(0, 8000)}\n\nWrite the reply body.`;
+  return (await callClaude(system, user)).trim();
+}
+
+module.exports = { generateColdFollowup, generateReply, generateCommandFromComment, extractReplyRules, consolidateRules, generateThreadReply, MODEL };

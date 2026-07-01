@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { supabase } = require('./_lib/supabase');
 const { json, startDialogueDrafts } = require('./_lib/core');
 const { generateCommandFromComment } = require('./_lib/claude');
+const { nowLocal, DateTime, ZONE } = require('./_lib/schedule');
 const front = require('./_lib/front');
 
 // Default §7a tag set (match these names when you create the tags in Front).
@@ -177,6 +178,29 @@ exports.handler = async (event) => {
       const present = tagNames.map((t) => t.toLowerCase());
       console.log('front-webhook tag:', JSON.stringify({ cId, emails, tagNames, matched: lead ? lead.email : null }));
 
+      // "Draft AI Response" tag → queue an AI draft reply on this conversation
+      // (lead or not). The engine generates it using the rules for the channel's
+      // account, creates the draft (never sends), and clears the tag.
+      if (present.includes('draft ai response') && cId) {
+        const { data: dup } = await supabase.from('scheduled_actions')
+          .select('id').eq('front_conversation_id', cId).is('lead_id', null)
+          .eq('action_type', 'draft').eq('status', 'pending').maybeSingle();
+        if (!dup) {
+          let label = 'Front conversation';
+          try { const conv = await front.getConversation(cId); label = conv?.subject || conv?.recipient?.handle || label; } catch { /* ignore */ }
+          await supabase.from('scheduled_actions').insert({
+            action_type: 'draft', step: 0, status: 'pending',
+            scheduled_for: new Date().toISOString(),
+            front_conversation_id: cId, label, generated_body: '',
+          });
+          try {
+            const base = process.env.URL || `https://${event.headers.host}`;
+            await Promise.race([fetch(`${base}/.netlify/functions/engine`), new Promise((r) => setTimeout(r, 8000))]);
+          } catch { /* cron backstop */ }
+        }
+        return json(200, { ok: true, handled: 'tag:draft-ai-response' });
+      }
+
       if (lead) {
         if (present.includes('pause')) await supabase.from('leads').update({ paused: true }).eq('id', lead.id);
         let chosen = null;
@@ -215,20 +239,43 @@ exports.handler = async (event) => {
       }
       const { lead, emails } = await resolveLead(payload, cId);
       console.log('front-webhook comment:', JSON.stringify({ cId, emails, matched: lead ? lead.email : null }));
+      const cleaned = text.replace(/@crm/ig, '').trim();
+      const nowText = nowLocal().toFormat("yyyy-MM-dd HH:mm '('cccc')'");
+
       if (lead) {
         // Remember the conversation so scheduled reminders can post here later.
         if (cId && lead.front_conversation_id !== cId) {
           await supabase.from('leads').update({ front_conversation_id: cId }).eq('id', lead.id);
           lead.front_conversation_id = cId;
         }
-        const cleaned = text.replace(/@crm/ig, '').trim();
         const { data: campaign } = await supabase.from('campaigns').select('*').eq('id', lead.campaign_id).maybeSingle();
         let cmd;
-        try { cmd = await generateCommandFromComment({ commentText: cleaned, lead, campaign }); }
+        try { cmd = await generateCommandFromComment({ commentText: cleaned, lead, campaign, nowText }); }
         catch { cmd = { action: 'none' }; }
         await applyCommand(cmd, lead, cId || lead.front_conversation_id);
+        return json(200, { ok: true, handled: 'comment', matched: true });
       }
-      return json(200, { ok: true, handled: 'comment', matched: !!lead });
+
+      // No matching lead: support a STANDALONE reminder on any conversation
+      // (e.g. a vendor email). We never create a lead — just schedule the comment.
+      if (cId) {
+        let cmd;
+        try { cmd = await generateCommandFromComment({ commentText: cleaned, lead: null, campaign: null, nowText }); }
+        catch { cmd = { action: 'none' }; }
+        if (cmd.action === 'remind') {
+          let body = (cmd.note && String(cmd.note).trim()) || 'This is your reminder to follow up.';
+          body = body.replace(/@crm/ig, '').trim();
+          let label = 'Front conversation';
+          try { const conv = await front.getConversation(cId); label = conv?.subject || conv?.recipient?.handle || label; } catch { /* ignore */ }
+          await supabase.from('scheduled_actions').insert({
+            action_type: 'comment', step: 0, status: 'pending',
+            scheduled_for: remindWhen(cmd), generated_body: body,
+            front_conversation_id: cId, label,
+          });
+          return json(200, { ok: true, handled: 'comment:standalone-reminder' });
+        }
+      }
+      return json(200, { ok: true, handled: 'comment:no-lead', matched: false });
     }
 
     // ---- Inbound message → reply-aware ----
@@ -312,6 +359,19 @@ function remindMs(cmd) {
   return 14 * UNIT_MS.days; // default: 2 weeks
 }
 
+// Resolve a reminder's fire time to a UTC ISO string. Supports an absolute local
+// datetime ("YYYY-MM-DD HH:mm" in Indianapolis) or a relative amount+unit delay.
+function remindWhen(cmd) {
+  if (cmd.at) {
+    const raw = String(cmd.at).trim().replace('T', ' ').slice(0, 16);
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(raw)) {
+      const dt = DateTime.fromFormat(raw, 'yyyy-MM-dd HH:mm', { zone: ZONE });
+      if (dt.isValid && dt.toMillis() > Date.now()) return dt.toUTC().toISO();
+    }
+  }
+  return new Date(Date.now() + remindMs(cmd)).toISOString();
+}
+
 async function applyCommand(cmd, lead, cId) {
   switch (cmd.action) {
     case 'pause':
@@ -335,7 +395,7 @@ async function applyCommand(cmd, lead, cId) {
       if (cId) { try { await front.syncStatusTag(cId, 'inactive'); } catch { /* ignore */ } }
       break;
     case 'remind': {
-      const when = new Date(Date.now() + remindMs(cmd)).toISOString();
+      const when = remindWhen(cmd);
       let body = (cmd.note && String(cmd.note).trim()) || 'This is your reminder to follow up.';
       body = body.replace(/@crm/ig, '').trim(); // never echo the trigger (avoids re-firing)
       await supabase.from('scheduled_actions').insert({

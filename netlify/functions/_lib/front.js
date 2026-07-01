@@ -191,6 +191,30 @@ async function getComments(conversationId) {
   const json = await frontFetch(`/conversations/${conversationId}/comments`);
   return json._results || [];
 }
+
+// Which of our channels (account address) a conversation belongs to. Matches any
+// message recipient/sender handle against our known channel addresses.
+async function channelAddressForConversation(conversationId) {
+  let msgs = [];
+  try { msgs = await getMessages(conversationId); } catch { /* ignore */ }
+  let channels = [];
+  try { channels = await listChannels(); } catch { /* ignore */ }
+  const known = new Map(channels.map((c) => [String(c.address || '').toLowerCase(), c.address]));
+  for (const m of msgs) {
+    for (const r of (m.recipients || [])) {
+      const h = String(r.handle || '').toLowerCase();
+      if (known.has(h)) return known.get(h);
+    }
+  }
+  // Fallback: an inbound message's first 'to', else null.
+  for (const m of msgs) {
+    if (m.is_inbound) {
+      const to = (m.recipients || []).find((r) => r.role === 'to');
+      if (to?.handle) return to.handle;
+    }
+  }
+  return null;
+}
 // Best-effort: pull readable text from the most recent inbound messages.
 async function getThreadText(conversationId, limit = 3) {
   const msgs = await getMessages(conversationId);
@@ -215,5 +239,6 @@ module.exports = {
   getConversation,
   getMessages,
   getComments,
+  channelAddressForConversation,
   getThreadText,
 };

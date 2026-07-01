@@ -3,8 +3,8 @@
 // and chains the next cold email.
 const { supabase } = require('./_lib/supabase');
 const { nowLocal } = require('./_lib/schedule');
-const { enqueueNextColdEmail, enqueueNextDialogueDraft } = require('./_lib/core');
-const { generateReply } = require('./_lib/claude');
+const { enqueueNextColdEmail, enqueueNextDialogueDraft, approvedPlaybook, replyInstructions, getInstructions } = require('./_lib/core');
+const { generateReply, generateThreadReply } = require('./_lib/claude');
 const front = require('./_lib/front');
 
 const MAX_PER_RUN = 25; // safety cap per invocation
@@ -22,6 +22,33 @@ async function claim(actionId) {
 }
 
 async function perform(action) {
+  // Standalone reminder (no lead): post the comment straight to its conversation.
+  if (action.action_type === 'comment' && !action.lead_id) {
+    if (!action.front_conversation_id) throw new Error('no conversation for standalone reminder');
+    await front.createComment({ conversationId: action.front_conversation_id, body: action.generated_body });
+    await supabase.from('scheduled_actions')
+      .update({ status: 'done', executed_at: new Date().toISOString() })
+      .eq('id', action.id);
+    return;
+  }
+
+  // Standalone "Draft AI Response" (no lead): draft a reply on any conversation,
+  // using the approved reply rules for that conversation's channel account.
+  if (action.action_type === 'draft' && !action.lead_id) {
+    if (!action.front_conversation_id) throw new Error('no conversation for draft');
+    const channelAddress = action.channel_address || await front.channelAddressForConversation(action.front_conversation_id);
+    const instructions = await replyInstructions(channelAddress);
+    let threadText = '';
+    try { threadText = await front.getThreadText(action.front_conversation_id); } catch { /* ignore */ }
+    const body = await generateThreadReply({ threadText, playbook: instructions, signOff: 'Andrew' });
+    await front.createDraftReply({ conversationId: action.front_conversation_id, channelAddress, body });
+    try { await front.removeTag(action.front_conversation_id, 'Draft AI Response'); } catch { /* ignore */ }
+    await supabase.from('scheduled_actions')
+      .update({ status: 'done', executed_at: new Date().toISOString() })
+      .eq('id', action.id);
+    return;
+  }
+
   const { data: lead } = await supabase.from('leads').select('*').eq('id', action.lead_id).maybeSingle();
   const { data: campaign } = await supabase.from('campaigns').select('*').eq('id', action.campaign_id).maybeSingle();
   if (!lead || !campaign) throw new Error('lead or campaign missing');
@@ -68,13 +95,19 @@ async function perform(action) {
     if (!body && lead.front_conversation_id) {
       let threadText = '';
       try { threadText = await front.getThreadText(lead.front_conversation_id); } catch { /* ignore */ }
-      const { data: settings } = await supabase.from('settings').select('key,value');
-      const map = Object.fromEntries((settings || []).map((r) => [r.key, r.value]));
-      // Fold in the approved Reply Playbook so learned rules shape the draft.
-      const { data: approved } = await supabase.from('reply_rules').select('rule_text, category').eq('status', 'approved');
-      const playbook = (approved || []).length
-        ? '\n\nReply playbook (learned from past replies — follow these):\n' + approved.map((r) => `- [${r.category}] ${r.rule_text}`).join('\n')
-        : '';
+      // Immediate reply drafts (step 1 with the toggle on) use the channel's
+      // global + account-specific instructions + rules. Scheduled dialogue
+      // follow-up nudge drafts use the campaign's Dialogue Follow Up instructions.
+      const isImmediate = action.step === 1 && campaign.immediate_draft_response !== false;
+      let styleGuide; let globalCorrections;
+      if (isImmediate) {
+        styleGuide = await replyInstructions(campaign.front_channel_address);
+        globalCorrections = '';
+      } else {
+        const rules = await approvedPlaybook(campaign.front_channel_address);
+        styleGuide = (campaign.dialogue_style_guide || '') + (rules || '');
+        globalCorrections = await getInstructions('global');
+      }
       try {
         const gen = await generateReply({
           kind: 'draft',
@@ -82,8 +115,8 @@ async function perform(action) {
           lead,
           threadText,
           firstNames: [lead.first_name].filter(Boolean),
-          styleGuide: (campaign.dialogue_style_guide || campaign.style_guide || '') + playbook,
-          globalCorrections: map.global_style_corrections || '',
+          styleGuide,
+          globalCorrections,
         });
         body = gen.body || '';
       } catch { body = `Hi ${lead.first_name || 'there'},\n\n`; }

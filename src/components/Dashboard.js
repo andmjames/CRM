@@ -117,17 +117,20 @@ export default function Dashboard({ data, onOpenLead, onViewUpcoming, onSelectCa
         {upcoming && upcoming.length === 0 && <div className="muted-sm">Nothing queued right now. Add or import leads to start outreach.</div>}
         {preview.map((a) => {
           const lead = a.lead || {};
-          const who = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email || 'Unknown';
+          const standalone = !a.lead_id;
+          const who = standalone
+            ? (a.label || 'Front conversation')
+            : ([lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email || 'Unknown');
           return (
-            <div key={a.id} className="auto-row" onClick={() => onOpenLead(a.lead_id)}>
+            <div key={a.id} className="auto-row" onClick={() => { if (a.lead_id) onOpenLead(a.lead_id); }} style={{ cursor: a.lead_id ? 'pointer' : 'default' }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 500 }}>
-                  <span className="pill cold" style={{ marginRight: 8 }}>{typeLabel(a.action_type)}</span>
+                  <span className="pill cold" style={{ marginRight: 8 }}>{standalone ? 'Reminder' : typeLabel(a.action_type)}</span>
                   {who}
                 </div>
                 <div className="lead-email" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {a.subject || a.generated_body || (a.action_type === 'draft' ? 'Written from the conversation on this date' : a.action_type === 'comment' ? 'Reminder posts on this date' : 'Generated when scheduled')}
-                  {a.campaign?.name ? ` · ${a.campaign.name}` : ''}
+                  {a.campaign?.name ? ` · ${a.campaign.name}` : (standalone ? ' · not a lead' : '')}
                 </div>
               </div>
               <span className="muted-sm" style={{ whiteSpace: 'nowrap', marginLeft: 12 }}>{fmtWhen(a.scheduled_for)}</span>

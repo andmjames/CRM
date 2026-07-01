@@ -36,4 +36,8 @@ export const api = {
   playbookRuleAction: (body) => call('playbook-rules', { method: 'POST', body }),
   emailInstructions: () => call('email-instructions'),
   saveEmailInstructions: (scope, instructions) => call('email-instructions', { method: 'POST', body: { scope, instructions } }),
+  // Shop for Leads (Apollo.io)
+  health: () => call('health'),
+  apolloSearch: (body) => call('apollo-search', { method: 'POST', body }),
+  apolloImport: (campaign_id, people) => call('apollo-import', { method: 'POST', body: { campaign_id, people } }),
 };

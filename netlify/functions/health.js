@@ -11,6 +11,7 @@ exports.handler = async () => {
       FRONT_AUTHOR_ID: present('FRONT_AUTHOR_ID'),
       ANTHROPIC_API_KEY: present('ANTHROPIC_API_KEY'),
       APP_ACCESS_TOKEN: present('APP_ACCESS_TOKEN'),
+      APOLLO_API_KEY: present('APOLLO_API_KEY'),
     },
     node: process.version,
     time: new Date().toISOString(),

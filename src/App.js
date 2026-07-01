@@ -4,6 +4,7 @@ import { LOGO_SRC } from './logo';
 import Dashboard from './components/Dashboard';
 import Leads from './components/Leads';
 import UpcomingEmails from './components/UpcomingEmails';
+import ShopLeads from './components/ShopLeads';
 import LeadDetail from './components/LeadDetail';
 import SettingsPanel from './components/SettingsPanel';
 import AddLeadModal from './components/AddLeadModal';
@@ -49,6 +50,7 @@ export default function App() {
         <nav>
           {tab('home', 'Dashboard')}
           {tab('leads', 'Leads')}
+          {tab('shop', 'Shop Leads')}
           {tab('upcoming', 'Upcoming')}
           {tab('settings', 'Settings')}
         </nav>
@@ -72,6 +74,8 @@ export default function App() {
             <Dashboard data={data} onOpenLead={openLead} onViewUpcoming={() => go('upcoming')} onSelectCampaign={goLeadsForCampaign} />
           ) : view === 'leads' ? (
             <Leads data={data} onOpenLead={openLead} campaignFilter={leadsFilter} onAddLead={() => setAdding(true)} />
+          ) : view === 'shop' ? (
+            <ShopLeads notify={notify} />
           ) : view === 'upcoming' ? (
             <UpcomingEmails onOpenLead={openLead} notify={notify} />
           ) : (

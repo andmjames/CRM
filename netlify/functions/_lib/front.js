@@ -66,6 +66,25 @@ async function sendMessage({ channelAddress, to, subject, body }) {
   });
 }
 
+// Send a genuine REPLY into an existing conversation (threaded). Used for cold
+// follow-ups so they land in the same email chain as the first email.
+async function sendReply({ conversationId, channelAddress, to, subject, body }) {
+  let channel_id = null;
+  if (channelAddress) { try { channel_id = await channelIdByAddress(channelAddress); } catch { /* ignore */ } }
+  return frontFetch(`/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      ...(channel_id ? { channel_id } : {}),
+      ...(to ? { to: Array.isArray(to) ? to : [to] } : {}),
+      ...(subject ? { subject } : {}),
+      body: withSignatureGap(body),
+      author_id: process.env.FRONT_AUTHOR_ID,
+      ...signatureFields(),
+      options: { archive: false },
+    }),
+  });
+}
+
 // Create a NEW-conversation draft from a channel (used when no thread exists yet).
 async function createDraft({ channelAddress, to, subject, body }) {
   return frontFetch(`/channels/${channelAlias(channelAddress)}/drafts`, {
@@ -227,6 +246,7 @@ async function getThreadText(conversationId, limit = 3) {
 
 module.exports = {
   sendMessage,
+  sendReply,
   createDraft,
   createDraftReply,
   createComment,

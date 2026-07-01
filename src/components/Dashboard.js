@@ -74,7 +74,7 @@ export default function Dashboard({ data, onOpenLead, onViewUpcoming, onSelectCa
         <div className="stat"><div className="n">{stats.totalLeads}</div><div className="l">Total leads</div></div>
         <div className="stat"><div className="n" style={{ color: 'var(--current)' }}>{stats.byStatus.cold || 0}</div><div className="l">Cold</div></div>
         <div className="stat"><div className="n" style={{ color: 'var(--current)' }}>{stats.byStatus.dialogue || 0}</div><div className="l">In dialogue</div></div>
-        <div className="stat"><div className="n" style={{ color: 'var(--current)' }}>{stats.byStatus.current_customer || 0}</div><div className="l">Current customers</div></div>
+        <div className="stat"><div className="n" style={{ color: 'var(--current)' }}>{stats.byStatus.current_customer || 0}</div><div className="l">Converted to customer</div></div>
       </div>
 
       {/* Leads by campaign */}

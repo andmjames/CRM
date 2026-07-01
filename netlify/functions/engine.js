@@ -73,14 +73,23 @@ async function perform(action) {
 
   let result;
   if (action.action_type === 'send') {
-    result = await front.sendMessage({
-      channelAddress: action.channel_address,
-      to: lead.email,
-      subject: action.subject,
-      body: action.generated_body,
-    });
-    // Link the Front conversation on first send so its status shows in Front.
-    if (!lead.front_conversation_id) {
+    if (lead.front_conversation_id) {
+      // Follow-up: send as a genuine reply within the first email's thread.
+      result = await front.sendReply({
+        conversationId: lead.front_conversation_id,
+        channelAddress: action.channel_address,
+        to: lead.email,
+        subject: action.subject,
+        body: action.generated_body,
+      });
+    } else {
+      // First email: start a new conversation, then link + tag it.
+      result = await front.sendMessage({
+        channelAddress: action.channel_address,
+        to: lead.email,
+        subject: action.subject,
+        body: action.generated_body,
+      });
       let cid = front.extractConversationId(result);
       if (!cid) { try { const c = await front.findConversationByEmail(lead.email); cid = c && c.id; } catch { /* ignore */ } }
       if (cid) {

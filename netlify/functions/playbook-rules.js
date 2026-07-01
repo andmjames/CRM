@@ -32,16 +32,7 @@ const _handler = async (event) => {
     const patch = { updated_at: new Date().toISOString() };
     if (p.rule_text !== undefined) patch.rule_text = p.rule_text;
     if (p.category !== undefined) patch.category = p.category;
-    if (p.account_email !== undefined) patch.account_email = p.account_email ? String(p.account_email).toLowerCase() : null;
     await supabase.from('reply_rules').update(patch).eq('id', p.id);
-    return json(200, { ok: true });
-  }
-  if (p.action === 'reassign_scope') {
-    // Move every rule from one scope to another. from/to are an email or null (global).
-    const to = p.to_account ? String(p.to_account).toLowerCase() : null;
-    let q = supabase.from('reply_rules').update({ account_email: to, updated_at: new Date().toISOString() });
-    q = p.from_account ? q.eq('account_email', String(p.from_account).toLowerCase()) : q.is('account_email', null);
-    await q;
     return json(200, { ok: true });
   }
   if (p.action === 'approve_all_suggested') {

@@ -74,8 +74,12 @@ export default function AddLeadModal({ campaigns, onClose, onCreated, notify }) 
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-pad">
           <div className="row" style={{ marginBottom: 6 }}>
-            <button className={`btn sm ${mode === 'single' ? '' : 'ghost'}`} onClick={() => setMode('single')}>Add a lead</button>
-            <button className={`btn sm ${mode === 'import' ? '' : 'ghost'}`} onClick={() => setMode('import')}>Import from a spreadsheet</button>
+            <div className="spacer" />
+            {mode === 'single' ? (
+              <button className="btn sm ghost" onClick={() => setMode('import')}>Import from a spreadsheet</button>
+            ) : (
+              <button className="btn sm ghost" onClick={() => setMode('single')}>Add a lead</button>
+            )}
           </div>
 
           {mode === 'single' ? (

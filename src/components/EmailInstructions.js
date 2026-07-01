@@ -14,7 +14,6 @@ export default function EmailInstructions({ notify }) {
   const [showRules, setShowRules] = useState(true);
   const [newRule, setNewRule] = useState('');
   const [newCat, setNewCat] = useState('general');
-  const [moveTarget, setMoveTarget] = useState('');
 
   const loadRules = useCallback(async () => {
     try { setRules((await api.playbookRules()).rules.filter((r) => r.status === 'approved')); }
@@ -60,20 +59,6 @@ export default function EmailInstructions({ notify }) {
     try { await api.playbookRuleAction({ action: 'delete', id }); await loadRules(); }
     catch (e) { notify(e.message); }
   }
-  async function moveRule(id, newScope) {
-    try {
-      await api.playbookRuleAction({ action: 'edit', id, account_email: newScope === 'global' ? null : newScope });
-      await loadRules();
-    } catch (e) { notify(e.message); }
-  }
-  async function bulkMove() {
-    if (!moveTarget || moveTarget === scope || scopeRulesAll.length === 0) return;
-    if (!window.confirm(`Move all ${scopeRulesAll.length} rule(s) from "${scopeLabel(scope)}" to "${scopeLabel(moveTarget)}"?`)) return;
-    try {
-      await api.playbookRuleAction({ action: 'reassign_scope', from_account: scope === 'global' ? null : scope, to_account: moveTarget === 'global' ? null : moveTarget });
-      setMoveTarget(''); await loadRules(); notify('Rules moved.');
-    } catch (e) { notify(e.message); }
-  }
 
   return (
     <>
@@ -108,18 +93,6 @@ export default function EmailInstructions({ notify }) {
           <div style={{ marginTop: 12 }}>
             <input placeholder="Search rules…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 10 }} />
 
-            {scopeRulesAll.length > 0 && (
-              <div className="row" style={{ gap: 8, alignItems: 'flex-end', marginBottom: 12 }}>
-                <label className="field" style={{ width: 260 }}><span>Move all {scopeRulesAll.length} rule(s) to</span>
-                  <select value={moveTarget} onChange={(e) => setMoveTarget(e.target.value)}>
-                    <option value="">Choose a channel…</option>
-                    {scopes.filter((sc) => sc !== scope).map((sc) => <option key={sc} value={sc}>{scopeLabel(sc)}</option>)}
-                  </select>
-                </label>
-                <button className="btn ghost" disabled={!moveTarget} onClick={bulkMove}>Move all</button>
-              </div>
-            )}
-
             {scopeRules.length === 0 && <p className="muted-sm">No rules here yet. Add one below, or approve mined rules in Email Response Learning.</p>}
             {scopeRules.map((r) => (
               <div className="card" key={r.id} style={{ padding: '9px 12px', marginBottom: 7 }}>
@@ -127,9 +100,6 @@ export default function EmailInstructions({ notify }) {
                 <div className="row" style={{ marginTop: 6, alignItems: 'center', gap: 8 }}>
                   <span className="muted-sm">seen {r.support_count}×</span>
                   <div className="spacer" />
-                  <select value={r.account_email || 'global'} onChange={(e) => moveRule(r.id, e.target.value)} style={{ width: 'auto', fontSize: 12, padding: '4px 6px' }}>
-                    {scopes.map((sc) => <option key={sc} value={sc}>{sc === 'global' ? 'Global' : sc}</option>)}
-                  </select>
                   <button className="btn ghost sm danger" onClick={() => delRule(r.id)}>Delete</button>
                 </div>
               </div>

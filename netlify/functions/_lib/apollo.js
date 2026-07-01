@@ -52,16 +52,13 @@ async function apolloFetch(path, { method = 'POST', query, body } = {}) {
 async function searchPeople(criteria = {}, page = 1) {
   const query = qs({
     person_titles: criteria.titles,
-    person_seniorities: criteria.seniorities,
     person_locations: criteria.locations,
-    organization_locations: criteria.org_locations,
-    organization_num_employees_ranges: criteria.employee_ranges,
+    organization_names: criteria.company_names,
+    q_organization_name: (criteria.company_names && criteria.company_names[0]) || undefined,
     q_organization_domains_list: criteria.org_domains,
-    q_organization_keyword_tags: criteria.org_keywords,
-    q_keywords: criteria.keywords,
     include_similar_titles: criteria.include_similar_titles ? 'true' : undefined,
     page,
-    per_page: criteria.per_page || 25,
+    per_page: criteria.per_page || 100,
   });
   return apolloFetch('/mixed_people/api_search', { query });
 }

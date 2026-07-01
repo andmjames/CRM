@@ -7,7 +7,7 @@ function StatusPill({ status }) {
   return <span className={`pill ${status}`}>{STATUS_LABEL[status] || status}</span>;
 }
 
-export default function Leads({ data, onOpenLead, campaignFilter, onAddLead }) {
+export default function Leads({ data, onOpenLead, campaignFilter, onAddLead, onShopLeads }) {
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [campaignSel, setCampaignSel] = useState(campaignFilter || 'all');
@@ -44,6 +44,7 @@ export default function Leads({ data, onOpenLead, campaignFilter, onAddLead }) {
         <h1 style={{ margin: 0 }}>All leads</h1>
         <div className="spacer" />
         <span className="muted-sm" style={{ marginRight: 12 }}>{rows.length} of {(data.leads || []).length}</span>
+        <button className="btn ghost sm" style={{ marginRight: 8 }} onClick={onShopLeads}>Shop for Leads</button>
         <button className="btn accent sm" onClick={onAddLead}>+ Add lead</button>
       </div>
 

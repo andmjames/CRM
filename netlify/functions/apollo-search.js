@@ -17,14 +17,11 @@ const _handler = async (event) => {
 
   const criteria = {
     titles: arr(p.titles),
-    seniorities: arr(p.seniorities),
     locations: arr(p.locations),
-    employee_ranges: arr(p.employee_ranges),
+    company_names: arr(p.company_name),
     org_domains: arr(p.org_domains),
-    org_keywords: arr(p.org_keywords),
-    keywords: (p.keywords || '').trim(),
     include_similar_titles: !!p.include_similar_titles,
-    per_page: 25,
+    per_page: 100,
   };
   const page = Math.max(1, parseInt(p.page, 10) || 1);
 

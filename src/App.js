@@ -18,6 +18,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
   const [adding, setAdding] = useState(false);
+  const [shopping, setShopping] = useState(false);
 
   const notify = useCallback((msg) => {
     setToast(msg);
@@ -50,7 +51,6 @@ export default function App() {
         <nav>
           {tab('home', 'Dashboard')}
           {tab('leads', 'Leads')}
-          {tab('shop', 'Shop Leads')}
           {tab('upcoming', 'Upcoming')}
           {tab('settings', 'Settings')}
         </nav>
@@ -73,9 +73,7 @@ export default function App() {
           ) : view === 'home' ? (
             <Dashboard data={data} onOpenLead={openLead} onViewUpcoming={() => go('upcoming')} onSelectCampaign={goLeadsForCampaign} />
           ) : view === 'leads' ? (
-            <Leads data={data} onOpenLead={openLead} campaignFilter={leadsFilter} onAddLead={() => setAdding(true)} />
-          ) : view === 'shop' ? (
-            <ShopLeads notify={notify} />
+            <Leads data={data} onOpenLead={openLead} campaignFilter={leadsFilter} onAddLead={() => setAdding(true)} onShopLeads={() => setShopping(true)} />
           ) : view === 'upcoming' ? (
             <UpcomingEmails onOpenLead={openLead} notify={notify} />
           ) : (
@@ -90,6 +88,14 @@ export default function App() {
           onClose={() => setAdding(false)}
           onCreated={() => { setAdding(false); load(); notify('Lead added — first email queued.'); }}
           notify={notify}
+        />
+      )}
+
+      {shopping && (
+        <ShopLeads
+          notify={notify}
+          onClose={() => setShopping(false)}
+          onImported={() => load()}
         />
       )}
 

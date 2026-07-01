@@ -1,5 +1,6 @@
 // apollo-search.js — "Shop for Leads" search. Free (no Apollo credits, no emails).
 const { json, requireAuth, safe } = require('./_lib/core');
+const { supabase } = require('./_lib/supabase');
 const apollo = require('./_lib/apollo');
 
 function arr(v) {
@@ -29,7 +30,19 @@ const _handler = async (event) => {
   try { data = await apollo.searchPeople(criteria, page); }
   catch (e) { return json(502, { error: e.message || 'Apollo search failed' }); }
 
-  const people = (data.people || []).map((x) => {
+  const raw = (data.people || []);
+
+  // Drop anyone we've already acted on (imported, or skipped as duplicate/
+  // suppressed/no-email) so the same contact never appears — or gets imported — twice.
+  const ids = raw.map((x) => x.id).filter(Boolean);
+  let seenSet = new Set();
+  if (ids.length) {
+    const { data: seenRows } = await supabase
+      .from('prospect_seen').select('apollo_person_id').in('apollo_person_id', ids);
+    seenSet = new Set((seenRows || []).map((r) => r.apollo_person_id));
+  }
+
+  const people = raw.filter((x) => !seenSet.has(x.id)).map((x) => {
     const org = x.organization || {};
     const last = x.last_name || x.last_name_obfuscated || '';
     return {

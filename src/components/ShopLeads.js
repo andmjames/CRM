@@ -76,7 +76,7 @@ export default function ShopLeads({ notify, onClose, onImported }) {
       let done = 0;
       for (const chunk of chunks) {
         setProgress({ done, total: chosen.length });
-        const payload = chunk.map((p) => ({ apollo_id: p.apollo_id, first_name: p.first_name, last_name: p.last_name, company: p.company, domain: p.domain }));
+        const payload = chunk.map((p) => ({ apollo_id: p.apollo_id, first_name: p.first_name, last_name: p.last_name, company: p.company, domain: p.domain, title: p.title, state: p.state }));
         const r = await api.apolloImport(campaignId, payload);
         ['imported', 'no_email', 'duplicates', 'suppressed', 'errors'].forEach((k) => { totals[k] += r[k] || 0; });
         done += chunk.length;

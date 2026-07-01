@@ -21,6 +21,8 @@ function colorForCampaign(c, i) {
 function LeadsDonut({ slices, total }) {
   const radius = 70, stroke = 26, cx = 100, cy = 100;
   const C = 2 * Math.PI * radius;
+  // A small gap between slices removes the jagged seam where segments abut.
+  const gap = (total > 0 && slices.length > 1) ? C * 0.02 : 0;
   let offset = 0;
   return (
     <svg viewBox="0 0 200 200" width="190" height="190" role="img" aria-label="Leads by campaign">
@@ -29,10 +31,11 @@ function LeadsDonut({ slices, total }) {
           <circle cx={cx} cy={cy} r={radius} fill="none" stroke="var(--border)" strokeWidth={stroke} />
         ) : slices.map((s) => {
           const len = (s.value / total) * C;
+          const seg = Math.max(len - gap, 0.001);
           const el = (
             <circle key={s.id} cx={cx} cy={cy} r={radius} fill="none"
-              stroke={s.color} strokeWidth={stroke}
-              strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-offset} />
+              stroke={s.color} strokeWidth={stroke} strokeLinecap="butt"
+              strokeDasharray={`${seg} ${C - seg}`} strokeDashoffset={-(offset + gap / 2)} />
           );
           offset += len;
           return el;

@@ -23,6 +23,17 @@ const _handler = async (event) => {
   if (!campaign) return json(404, { error: 'campaign not found' });
 
   const results = { imported: 0, no_email: 0, duplicates: 0, suppressed: 0, errors: 0, leads: [] };
+  const seen = [];
+  const markSeen = (p) => {
+    if (!p || !p.apollo_id) return;
+    seen.push({
+      apollo_person_id: p.apollo_id,
+      name: [p.first_name, p.last_name].filter(Boolean).join(' ') || null,
+      company: p.company || null,
+      title: p.title || null,
+      state: p.state || null,
+    });
+  };
 
   for (const person of people) {
     try {
@@ -40,11 +51,11 @@ const _handler = async (event) => {
       } catch { enr = null; }
 
       const email = enr && enr.email ? String(enr.email).trim().toLowerCase() : '';
-      if (!email || LOCKED.test(email)) { results.no_email++; continue; }
+      if (!email || LOCKED.test(email)) { results.no_email++; markSeen(person); continue; }
 
-      if (await isSuppressed(email)) { results.suppressed++; continue; }
+      if (await isSuppressed(email)) { results.suppressed++; markSeen(person); continue; }
       const { data: existing } = await supabase.from('leads').select('id').ilike('email', email).maybeSingle();
-      if (existing) { results.duplicates++; continue; }
+      if (existing) { results.duplicates++; markSeen(person); continue; }
 
       const first_name = (enr.first_name || person.first_name || '').trim();
       const last_name = (enr.last_name || person.last_name || '').trim();
@@ -75,9 +86,17 @@ const _handler = async (event) => {
       if (error || !lead) { results.errors++; continue; }
 
       await enqueueColdEmail1(lead, campaign);
+      markSeen(person);
       results.imported++;
       results.leads.push({ id: lead.id, email, first_name, company: companyName });
     } catch { results.errors++; }
+  }
+
+  // Remember every Apollo contact we acted on so it never resurfaces in search
+  // (and we never spend another credit re-enriching the same person).
+  if (seen.length) {
+    try { await supabase.from('prospect_seen').upsert(seen, { onConflict: 'apollo_person_id', ignoreDuplicates: true }); }
+    catch { /* ignore */ }
   }
 
   // Kick the engine so immediate first emails go out promptly (best-effort).
